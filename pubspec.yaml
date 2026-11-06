@@ -1,5 +1,5 @@
 name: coterie
-description: "Coterie — Institute for Rare & Exact Diction. Minimalist museum ticket loading experience."
+description: "Coterie — Minimalist museum ticket loading experience."
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -20,28 +20,24 @@ flutter:
 
   assets:
     - assets/images/dutch_16c_bw_grain.png
-    - assets/images/dutch_16c_original.jpg
     - assets/images/paper_texture.png
+    - assets/images/weather_header.png
 
   fonts:
-    - family: CormorantGaramond
+    - family: Niloofar
       fonts:
-        - asset: assets/fonts/CormorantGaramond-Regular.ttf
-        - asset: assets/fonts/CormorantGaramond-Italic.ttf
+        - asset: assets/fonts/XBNiloofar-Regular.ttf
+        - asset: assets/fonts/XBNiloofar-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/XBNiloofar-Italic.ttf
           style: italic
-    - family: BodoniModa
-      fonts:
-        - asset: assets/fonts/BodoniModa-Regular.ttf
-        - asset: assets/fonts/BodoniModa-Italic.ttf
-          style: italic
-    - family: Syne
-      fonts:
-        - asset: assets/fonts/Syne-Variable.ttf
-    - family: PlusJakartaSans
-      fonts:
-        - asset: assets/fonts/PlusJakartaSans-Variable.ttf
     - family: SpaceMono
       fonts:
         - asset: assets/fonts/SpaceMono-Regular.ttf
         - asset: assets/fonts/SpaceMono-Bold.ttf
           weight: 700
+    - family: CormorantGaramond
+      fonts:
+        - asset: assets/fonts/CormorantGaramond-Regular.ttf
+        - asset: assets/fonts/CormorantGaramond-Italic.ttf
+          style: italic

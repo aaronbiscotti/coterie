@@ -8,7 +8,7 @@ void main() {
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Color(0xFFFBFBF9),
+      systemNavigationBarColor: Color(0xFFFFFFFF),
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
@@ -21,12 +21,12 @@ class CoterieApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Coterie — Institute for Rare & Exact Diction',
+      title: 'Coterie',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        scaffoldBackgroundColor: const Color(0xFFFBFBF9),
-        fontFamily: 'PlusJakartaSans',
+        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+        fontFamily: 'Niloofar',
       ),
       home: const TicketLoadingScreen(),
     );
