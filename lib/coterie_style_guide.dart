@@ -5,25 +5,34 @@ import 'package:flutter/physics.dart';
 /// ============================================================================
 /// COTERIE DESIGN SYSTEM & STYLE GUIDE
 /// ============================================================================
-/// Codifies:
-/// 1. Architectural Hardware Bezel & Fuzzy Velvet-Black Aperture Surfaces
-/// 2. Editorial Serif (Instrument Serif & XB Niloofar) + Thermal Receipt Mono
-/// 3. Embossed Die-Stamped Typography
-/// 4. Nintendo / Apple / Design-Engineering Substack Motion Curves & Springs
+/// 1. Top Slit Aperture (`CoterieBezelAperturePainter`):
+///    Recessed stadium slot hole with deep fuzzy velvet-black interior cavity.
+/// 2. Hardware Bezel Button (`CoterieBezelButton`):
+///    Structured differently from the top hole — a full-face rounded-rectangle
+///    tactile button with a thin anodized outer bezel rim, recessed chamfer, and
+///    fuzzy velvet-black (or pure white) button cap.
+/// 3. Strict Typography (`CoterieTypography`):
+///    - Serif (`InstrumentSerif`) ONLY for vocabulary word titles.
+///    - Non-serif (`ReceiptMono`) for definitions and button labels.
+/// 4. Strict Palette: Pure White (`#FFFFFF`) and Black (`#000000`).
 /// ============================================================================
 
 class CoterieColors {
   const CoterieColors._();
 
-  // Canvas & Archival Paper
+  // Pure White & Black for Home Screen
+  static const Color pureWhite = Color(0xFFFFFFFF);
+  static const Color pureBlack = Color(0xFF000000);
+  static const Color hairlineBlack = Color(0xFFE8E8E8);
+
+  // Ticket paper (used only on the physical museum ticket)
   static const Color galleryWhite = Color(0xFFFFFFFF);
   static const Color archivalCream = Color(0xFFF3F0E8);
-  static const Color hairlineDivider = Color(0xFFE5E2DA);
-  static const Color inkPrimary = Color(0xFF141312);
-  static const Color inkSecondary = Color(0xFF2B2A27);
-  static const Color inkMuted = Color(0xFF6E6B64);
+  static const Color inkPrimary = Color(0xFF000000);
+  static const Color inkSecondary = Color(0xFF1A1A1A);
+  static const Color inkMuted = Color(0xFF666666);
 
-  // Bezeled Hardware Opening (Outer Anodized Gray -> Inner Bevel -> Fuzzy Black)
+  // Bezeled Hardware Palette (Anodized Gray Outer -> Chamfer -> Velvet Black)
   static const List<Color> outerBezelGradient = [
     Color(0xFFE7E6E2),
     Color(0xFFD6D5D0),
@@ -46,19 +55,29 @@ class CoterieColors {
     Color(0xFF101013),
     Color(0xFF050507),
   ];
+
+  static const List<Color> darkKeycapGradient = [
+    Color(0xFF141417),
+    Color(0xFF0B0B0D),
+    Color(0xFF050506),
+  ];
+  static const List<Color> whiteKeycapGradient = [
+    Color(0xFFFFFFFF),
+    Color(0xFFFAFAFA),
+    Color(0xFFF2F2F2),
+  ];
   static const Color fuzzyVelvetFleck = Color(0xFF34343A);
 }
 
 class CoterieTypography {
   const CoterieTypography._();
 
-  static const String displaySerifFamily = 'InstrumentSerif';
-  static const String bodySerifFamily = 'Niloofar';
-  static const String receiptMonoFamily = 'ReceiptMono';
+  static const String wordTitleSerifFamily = 'InstrumentSerif';
+  static const String monoFamily = 'ReceiptMono';
 
-  /// High-fashion display wordmark ("Coterie")
+  /// High-fashion display wordmark on ticket ("Coterie")
   static const TextStyle displayTitle = TextStyle(
-    fontFamily: displaySerifFamily,
+    fontFamily: wordTitleSerifFamily,
     fontSize: 40.0,
     fontWeight: FontWeight.w400,
     height: 0.88,
@@ -66,9 +85,38 @@ class CoterieTypography {
     color: Color(0xFFF7F5EE),
   );
 
+  /// SERIF ONLY FOR WORD TITLES: Large focus word title
+  static const TextStyle heroWordTitleSerif = TextStyle(
+    fontFamily: wordTitleSerifFamily,
+    fontSize: 54.0,
+    fontWeight: FontWeight.w400,
+    height: 0.95,
+    letterSpacing: 0.2,
+    color: CoterieColors.pureBlack,
+  );
+
+  /// SERIF ONLY FOR WORD TITLES: List row word title
+  static const TextStyle listWordTitleSerif = TextStyle(
+    fontFamily: wordTitleSerifFamily,
+    fontSize: 28.0,
+    fontWeight: FontWeight.w400,
+    height: 1.0,
+    letterSpacing: 0.2,
+    color: CoterieColors.pureBlack,
+  );
+
+  /// Non-serif definition & body copy
+  static const TextStyle definitionText = TextStyle(
+    fontFamily: monoFamily,
+    fontSize: 12.5,
+    height: 1.4,
+    letterSpacing: 0.1,
+    color: CoterieColors.pureBlack,
+  );
+
   /// Physically embossed single-line uppercase label
   static const TextStyle embossedLabel = TextStyle(
-    fontFamily: receiptMonoFamily,
+    fontFamily: monoFamily,
     fontSize: 9.5,
     letterSpacing: 1.15,
     color: Color(0xFFDAD7CE),
@@ -86,39 +134,23 @@ class CoterieTypography {
     ],
   );
 
-  /// Thermal receipt metadata
+  /// Non-serif metadata / UI label
   static const TextStyle receiptMeta = TextStyle(
-    fontFamily: receiptMonoFamily,
+    fontFamily: monoFamily,
     fontSize: 10.5,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     height: 1.25,
-    color: CoterieColors.inkSecondary,
-  );
-
-  /// Literary serif headword
-  static const TextStyle headwordSerif = TextStyle(
-    fontFamily: bodySerifFamily,
-    fontSize: 22.0,
-    fontWeight: FontWeight.w700,
-    letterSpacing: 0.1,
-    height: 1.15,
-    color: CoterieColors.inkPrimary,
+    color: CoterieColors.pureBlack,
   );
 }
 
 class CoterieMotion {
   const CoterieMotion._();
 
-  /// Emil Kowalski / Rauno Freiberg strong ease-out for immediate input response
   static const Cubic snappyOut = Cubic(0.23, 1.0, 0.32, 1.0);
-
-  /// High-torque primary deceleration curve
   static const Cubic primaryDecel = Cubic(0.16, 1.0, 0.30, 1.0);
-
-  /// iOS sheet / full-screen push transition curve
   static const Cubic sheetTransition = Cubic(0.32, 0.72, 0.0, 1.0);
 
-  /// Apple WWDC18 Fluid Interfaces snappy underdamped spring
   static const SpringDescription snappySpring = SpringDescription(
     mass: 1.0,
     stiffness: 380.0,
@@ -126,19 +158,16 @@ class CoterieMotion {
   );
 }
 
-/// Reusable painter for the Coterie signature bezeled hardware opening
-/// (anodized gray rounded border, recessed inner bevel, fuzzy velvet-black interior).
+/// Painter for the TOP TICKET SLIT OPENING (a recessed pill slot hole).
 class CoterieBezelAperturePainter extends CustomPainter {
   final double bevelInset;
   final double throatHorizontalInset;
   final double throatVerticalInset;
-  final double pressedProgress;
 
   const CoterieBezelAperturePainter({
     this.bevelInset = 4.2,
     this.throatHorizontalInset = 26.0,
     this.throatVerticalInset = 15.0,
-    this.pressedProgress = 0.0,
   });
 
   @override
@@ -165,16 +194,13 @@ class CoterieBezelAperturePainter extends CustomPainter {
       Radius.circular(throatRect.height / 2),
     );
 
-    // 1. Soft outer drop shadow on the white gallery background
-    final shadowOffset = Offset(0, 3.0 * (1.0 - pressedProgress * 0.6));
     canvas.drawRRect(
-      outerRRect.shift(shadowOffset),
+      outerRRect.shift(const Offset(0, 3.0)),
       Paint()
         ..color = const Color(0xFF000000).withValues(alpha: 0.10)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0),
     );
 
-    // 2. Outer gray rounded border housing
     final outerGradient = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -191,7 +217,6 @@ class CoterieBezelAperturePainter extends CustomPainter {
         ..color = CoterieColors.outerBezelStroke,
     );
 
-    // 3. Inner recessed chamfer bevel
     final bevelGradient = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -200,7 +225,6 @@ class CoterieBezelAperturePainter extends CustomPainter {
     ).createShader(bevelRect);
     canvas.drawRRect(bevelRRect, Paint()..shader = bevelGradient);
 
-    // 4. Fuzzy black interior feather halo
     canvas.drawRRect(
       throatRRect.inflate(2.4),
       Paint()
@@ -208,7 +232,6 @@ class CoterieBezelAperturePainter extends CustomPainter {
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.2),
     );
 
-    // 5. Deep fuzzy velvet-black interior cavity
     final throatShader = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -216,7 +239,6 @@ class CoterieBezelAperturePainter extends CustomPainter {
     ).createShader(throatRect);
     canvas.drawRRect(throatRRect, Paint()..shader = throatShader);
 
-    // 6. Stochastic velvet micro-flecks inside the dark cavity
     final rng = math.Random(42);
     final dotPaint = Paint();
     canvas.save();
@@ -232,34 +254,153 @@ class CoterieBezelAperturePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CoterieBezelAperturePainter oldDelegate) {
-    return oldDelegate.pressedProgress != pressedProgress ||
-        oldDelegate.bevelInset != bevelInset ||
-        oldDelegate.throatHorizontalInset != throatHorizontalInset ||
-        oldDelegate.throatVerticalInset != throatVerticalInset;
+  bool shouldRepaint(covariant CoterieBezelAperturePainter oldDelegate) =>
+      false;
+}
+
+/// Painter for HARDWARE BEZEL BUTTONS:
+/// Structured differently from the slit hole — instead of a narrow slot with
+/// wide side margins, this is a full-face rounded-rectangle tactile button cap
+/// framed by a uniform thin anodized bezel and recessed chamfer.
+class CoterieBezelKeycapPainter extends CustomPainter {
+  final bool isDark;
+  final double cornerRadius;
+  final double bezelThickness;
+  final double pressedProgress;
+
+  const CoterieBezelKeycapPainter({
+    this.isDark = true,
+    this.cornerRadius = 10.0,
+    this.bezelThickness = 3.2,
+    this.pressedProgress = 0.0,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final outerRRect = RRect.fromRectAndRadius(
+      rect,
+      Radius.circular(cornerRadius),
+    );
+
+    final chamferRect = rect.deflate(bezelThickness * 0.55);
+    final chamferRRect = RRect.fromRectAndRadius(
+      chamferRect,
+      Radius.circular(math.max(2.0, cornerRadius - bezelThickness * 0.5)),
+    );
+
+    final capRect = rect
+        .deflate(bezelThickness)
+        .shift(Offset(0, pressedProgress * 0.8));
+    final capRadius = math.max(2.0, cornerRadius - bezelThickness);
+    final capRRect = RRect.fromRectAndRadius(
+      capRect,
+      Radius.circular(capRadius),
+    );
+
+    // 1. Soft outer drop shadow
+    final shadowDy = 2.0 * (1.0 - pressedProgress * 0.6);
+    canvas.drawRRect(
+      outerRRect.shift(Offset(0, shadowDy)),
+      Paint()
+        ..color = const Color(0xFF000000).withValues(alpha: 0.08)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5),
+    );
+
+    // 2. Anodized outer bezel frame
+    final outerGradient = const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: CoterieColors.outerBezelGradient,
+      stops: [0.0, 0.45, 0.80, 1.0],
+    ).createShader(rect);
+    canvas.drawRRect(outerRRect, Paint()..shader = outerGradient);
+
+    canvas.drawRRect(
+      outerRRect.deflate(0.5),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..color = CoterieColors.outerBezelStroke,
+    );
+
+    // 3. Recessed inner chamfer
+    final chamferGradient = const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: CoterieColors.innerChamferGradient,
+      stops: [0.0, 0.35, 0.72, 1.0],
+    ).createShader(chamferRect);
+    canvas.drawRRect(chamferRRect, Paint()..shader = chamferGradient);
+
+    if (isDark) {
+      // 4A. Fuzzy black edge feather
+      canvas.drawRRect(
+        capRRect.inflate(0.9),
+        Paint()
+          ..color = CoterieColors.fuzzyBlackFeather.withValues(alpha: 0.80)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.4),
+      );
+
+      // 5A. Full-face velvet-black button keycap
+      final capShader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: CoterieColors.darkKeycapGradient,
+      ).createShader(capRect);
+      canvas.drawRRect(capRRect, Paint()..shader = capShader);
+
+      final rng = math.Random(42);
+      final dotPaint = Paint();
+      canvas.save();
+      canvas.clipRRect(capRRect);
+      for (int i = 0; i < 120; i++) {
+        final fx = capRect.left + rng.nextDouble() * capRect.width;
+        final fy = capRect.top + rng.nextDouble() * capRect.height;
+        dotPaint.color = CoterieColors.fuzzyVelvetFleck
+            .withValues(alpha: 0.08 + rng.nextDouble() * 0.10);
+        canvas.drawCircle(Offset(fx, fy), 0.55, dotPaint);
+      }
+      canvas.restore();
+    } else {
+      // 4B. Pure white button keycap inside the same anodized bezel frame
+      final capShader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: CoterieColors.whiteKeycapGradient,
+      ).createShader(capRect);
+      canvas.drawRRect(capRRect, Paint()..shader = capShader);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CoterieBezelKeycapPainter oldDelegate) {
+    return oldDelegate.isDark != isDark ||
+        oldDelegate.cornerRadius != cornerRadius ||
+        oldDelegate.bezelThickness != bezelThickness ||
+        oldDelegate.pressedProgress != pressedProgress;
   }
 }
 
-/// Interactive button styled identically to the hyperrealistic bezeled opening at the top:
-/// - Outer anodized gray rounded border
-/// - Recessed inner bevel rim
-/// - Deep fuzzy velvet-black interior cavity
-/// - Embossed / high-contrast receipt-mono & serif label inside
-/// - Snappy Apple/Nintendo spring compression and release physics
+/// Interactive hardware-bezel button (structured as a button cap, not a hole).
 class CoterieBezelButton extends StatefulWidget {
   final String label;
   final String? trailingGlyph;
   final VoidCallback onPressed;
-  final double width;
+  final double? width;
   final double height;
+  final bool isDark;
+  final double cornerRadius;
 
   const CoterieBezelButton({
     super.key,
     required this.label,
     required this.onPressed,
-    this.trailingGlyph = '→',
-    this.width = 248.0,
-    this.height = 50.0,
+    this.trailingGlyph,
+    this.width,
+    this.height = 44.0,
+    this.isDark = true,
+    this.cornerRadius = 10.0,
   });
 
   @override
@@ -317,6 +458,10 @@ class _CoterieBezelButtonState extends State<CoterieBezelButton>
 
   @override
   Widget build(BuildContext context) {
+    final textColor = widget.isDark
+        ? CoterieColors.pureWhite
+        : CoterieColors.pureBlack;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -327,8 +472,8 @@ class _CoterieBezelButtonState extends State<CoterieBezelButton>
           animation: _pressController,
           builder: (context, child) {
             final p = _pressController.value.clamp(-0.25, 1.25);
-            final scale = 1.0 - (p * 0.045);
-            final dy = p * 1.6;
+            final scale = 1.0 - (p * 0.032);
+            final dy = p * 1.2;
             return Transform.translate(
               offset: Offset(0, dy),
               child: Transform.scale(
@@ -337,10 +482,10 @@ class _CoterieBezelButtonState extends State<CoterieBezelButton>
                   width: widget.width,
                   height: widget.height,
                   child: CustomPaint(
-                    painter: CoterieBezelAperturePainter(
-                      bevelInset: 4.5,
-                      throatHorizontalInset: 18.0,
-                      throatVerticalInset: 13.0,
+                    painter: CoterieBezelKeycapPainter(
+                      isDark: widget.isDark,
+                      cornerRadius: widget.cornerRadius,
+                      bezelThickness: 3.2,
                       pressedProgress: p.clamp(0.0, 1.0),
                     ),
                     child: child,
@@ -349,34 +494,38 @@ class _CoterieBezelButtonState extends State<CoterieBezelButton>
               ),
             );
           },
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18.0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  widget.label,
+                  style: widget.isDark
+                      ? CoterieTypography.embossedLabel.copyWith(
+                          fontSize: 10.5,
+                          letterSpacing: 1.2,
+                          color: textColor,
+                        )
+                      : CoterieTypography.receiptMeta.copyWith(
+                          fontSize: 10.5,
+                          letterSpacing: 1.1,
+                          color: textColor,
+                        ),
+                ),
+                if (widget.trailingGlyph != null) ...[
+                  const SizedBox(width: 8),
                   Text(
-                    widget.label,
-                    style: CoterieTypography.embossedLabel.copyWith(
-                      fontSize: 10.5,
-                      letterSpacing: 1.4,
-                      color: const Color(0xFFF3F0E8),
+                    widget.trailingGlyph!,
+                    style: TextStyle(
+                      fontFamily: CoterieTypography.monoFamily,
+                      fontSize: 11.5,
+                      color: textColor,
                     ),
                   ),
-                  if (widget.trailingGlyph != null) ...[
-                    const SizedBox(width: 10),
-                    Text(
-                      widget.trailingGlyph!,
-                      style: const TextStyle(
-                        fontFamily: CoterieTypography.receiptMonoFamily,
-                        fontSize: 12.0,
-                        color: Color(0xFFF3F0E8),
-                      ),
-                    ),
-                  ],
                 ],
-              ),
+              ],
             ),
           ),
         ),

@@ -589,7 +589,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                                                 ),
                                               ),
 
-                                              // 5. POST-CUT BEZELED BUTTON (Styled like top opening; pushes everything up)
+                                              // 5. POST-CUT BEZELED BUTTON (Styled like top opening, structured as a button)
                                               if (_isRippedOff && btnT > 0.0)
                                                 Positioned(
                                                   top: 196.0 +
@@ -602,43 +602,12 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                                                     child: Transform.scale(
                                                       scale:
                                                           0.92 + (btnT * 0.08),
-                                                      child: Column(
-                                                        mainAxisSize:
-                                                            MainAxisSize.min,
-                                                        children: [
-                                                          CoterieBezelButton(
-                                                            label:
-                                                                'ENTER LEXICON',
-                                                            trailingGlyph: '↑',
-                                                            width: 256.0,
-                                                            height: 48.0,
-                                                            onPressed:
-                                                                _triggerPushUpToHome,
-                                                          ),
-                                                          const SizedBox(
-                                                            height: 16,
-                                                          ),
-                                                          GestureDetector(
-                                                            onTap:
-                                                                _resetAndReprint,
-                                                            child: MouseRegion(
-                                                              cursor:
-                                                                  SystemMouseCursors
-                                                                      .click,
-                                                              child: Text(
-                                                                '[ reprint ticket ]',
-                                                                style: CoterieTypography
-                                                                    .receiptMeta
-                                                                    .copyWith(
-                                                                      fontSize:
-                                                                          10.0,
-                                                                      color: CoterieColors
-                                                                          .inkMuted,
-                                                                    ),
-                                                              ),
-                                                            ),
-                                                          ),
-                                                        ],
+                                                      child: CoterieBezelButton(
+                                                        label: 'ENTER',
+                                                        width: 184.0,
+                                                        height: 44.0,
+                                                        onPressed:
+                                                            _triggerPushUpToHome,
                                                       ),
                                                     ),
                                                   ),
