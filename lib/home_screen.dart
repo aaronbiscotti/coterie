@@ -34,49 +34,49 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
     VocabularyEntry(
       word: 'coterie',
       partOfSpeech: 'n.',
-      definition: 'a small, select group of people with shared interests.',
+      definition: 'A small, select group of people with shared interests.',
       isSaved: true,
     ),
     VocabularyEntry(
       word: 'cur',
       partOfSpeech: 'n.',
-      definition: 'a mongrel dog; a contemptible or cowardly person.',
+      definition: 'A mongrel dog; a contemptible or cowardly person.',
       isSaved: true,
     ),
     VocabularyEntry(
       word: 'dearth',
       partOfSpeech: 'n.',
-      definition: 'a scarcity or lack of something needed.',
+      definition: 'A scarcity or lack of something needed.',
       isSaved: false,
     ),
     VocabularyEntry(
       word: 'brook',
       partOfSpeech: 'v.',
-      definition: 'to tolerate or allow, especially dissent or delay.',
+      definition: 'To tolerate or allow, especially dissent or delay.',
       isSaved: true,
     ),
     VocabularyEntry(
       word: 'untoward',
       partOfSpeech: 'adj.',
-      definition: 'unexpected and inappropriate or inconvenient.',
+      definition: 'Unexpected and inappropriate or inconvenient.',
       isSaved: false,
     ),
     VocabularyEntry(
       word: 'chide',
       partOfSpeech: 'v.',
-      definition: 'to scold or rebuke gently.',
+      definition: 'To scold or rebuke gently.',
       isSaved: false,
     ),
     VocabularyEntry(
       word: 'fetter',
       partOfSpeech: 'v.',
-      definition: 'to restrain with chains; to restrict freedom.',
+      definition: 'To restrain with chains; to restrict freedom.',
       isSaved: false,
     ),
     VocabularyEntry(
       word: 'augur',
       partOfSpeech: 'v.',
-      definition: 'to portend a good or bad outcome; to foreshadow.',
+      definition: 'To portend a good or bad outcome; to foreshadow.',
       isSaved: false,
     ),
   ];
@@ -104,26 +104,29 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
           backgroundColor: CoterieColors.pureWhite,
           elevation: 0,
           shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.zero,
-            side: BorderSide(color: CoterieColors.pureBlack, width: 1.0),
+            borderRadius: BorderRadius.all(Radius.circular(12)),
+            side: BorderSide(color: CoterieColors.hairlineBlack, width: 1.0),
           ),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
+            constraints: const BoxConstraints(maxWidth: 380),
             child: Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(28.0),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Word Title input in Serif
                   TextField(
                     controller: wordCtrl,
                     autofocus: true,
                     style: CoterieTypography.listWordTitleSerif,
                     decoration: const InputDecoration(
-                      hintText: 'word',
+                      isDense: true,
+                      contentPadding: EdgeInsets.only(bottom: 10),
+                      hintText: 'Word',
                       hintStyle: TextStyle(
                         fontFamily: CoterieTypography.wordTitleSerifFamily,
-                        fontSize: 28,
+                        fontSize: 26,
                         color: CoterieColors.inkMuted,
                       ),
                       enabledBorder: UnderlineInputBorder(
@@ -136,15 +139,18 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+                  // Definition input in Sans-Serif
                   TextField(
                     controller: defCtrl,
-                    style: CoterieTypography.definitionText,
+                    style: CoterieTypography.listDefinitionSans,
                     decoration: const InputDecoration(
-                      hintText: 'definition',
+                      isDense: true,
+                      contentPadding: EdgeInsets.only(bottom: 10),
+                      hintText: 'Definition',
                       hintStyle: TextStyle(
-                        fontFamily: CoterieTypography.monoFamily,
-                        fontSize: 12.5,
+                        fontFamily: CoterieTypography.sansFamily,
+                        fontSize: 14.0,
                         color: CoterieColors.inkMuted,
                       ),
                       enabledBorder: UnderlineInputBorder(
@@ -157,20 +163,22 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 28),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       CoterieBezelButton(
-                        label: 'CANCEL',
+                        label: 'Cancel',
                         isDark: false,
+                        width: 92,
                         height: 38,
                         onPressed: () => Navigator.of(ctx).pop(),
                       ),
                       const SizedBox(width: 10),
                       CoterieBezelButton(
-                        label: 'SAVE',
+                        label: 'Save',
                         isDark: true,
+                        width: 92,
                         height: 38,
                         onPressed: () {
                           final w = wordCtrl.text.trim();
@@ -213,50 +221,99 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
+            constraints: const BoxConstraints(
+              maxWidth: CoterieSpacing.maxContentWidth,
+            ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+              padding: const EdgeInsets.fromLTRB(
+                CoterieSpacing.pageHorizontalMargin,
+                CoterieSpacing.pageTopMargin,
+                CoterieSpacing.pageHorizontalMargin,
+                CoterieSpacing.pageBottomMargin,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // 1. FOCUS WORD (Learn)
+                  // ==========================================================
+                  // 1. HERO STUDY BLOCK (Flush-left locked, fixed vertical rhythm)
+                  // ==========================================================
                   AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 200),
+                    duration: const Duration(milliseconds: 180),
                     switchInCurve: CoterieMotion.snappyOut,
-                    child: Column(
+                    layoutBuilder: (currentChild, previousChildren) {
+                      return Stack(
+                        alignment: Alignment.topLeft,
+                        children: <Widget>[
+                          ...previousChildren,
+                          if (currentChild != null) currentChild,
+                        ],
+                      );
+                    },
+                    child: SizedBox(
                       key: ValueKey<String>(current.word),
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Word title ONLY in Serif
-                        Text(
-                          current.word,
-                          style: CoterieTypography.heroWordTitleSerif,
-                        ),
-                        const SizedBox(height: 10),
-                        // Definition in Non-Serif
-                        Text(
-                          '${current.partOfSpeech}  ${current.definition}',
-                          style: CoterieTypography.definitionText,
-                        ),
-                      ],
+                      width: double.infinity,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Word Title (Serif ONLY) + Part of Speech (Sans-Serif) aligned on baseline
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                current.word,
+                                style: CoterieTypography.heroWordTitleSerif,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                current.partOfSpeech,
+                                style: CoterieTypography.partOfSpeechSans,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(
+                            height: CoterieSpacing.titleToDefinitionGap,
+                          ),
+                          // Definition in clean Sans-Serif with fixed 2-line height reservation
+                          // so the button row below never shifts vertically.
+                          SizedBox(
+                            height: CoterieSpacing.heroDefinitionHeight,
+                            child: Align(
+                              alignment: Alignment.topLeft,
+                              child: Text(
+                                current.definition,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: CoterieTypography.heroDefinitionSans,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 22),
 
-                  // 2. HARDWARE BEZEL BUTTONS (Save & Next)
+                  const SizedBox(height: CoterieSpacing.definitionToActionsGap),
+
+                  // ==========================================================
+                  // 2. HARDWARE BEZEL BUTTON ROW (Fixed widths = zero layout shift)
+                  // ==========================================================
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       CoterieBezelButton(
-                        label: current.isSaved ? 'SAVED' : 'SAVE',
+                        label: current.isSaved ? 'Saved' : 'Save',
                         isDark: current.isSaved,
+                        width: 96,
                         height: 40,
                         onPressed: () => _toggleSave(current),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: CoterieSpacing.buttonGap),
                       CoterieBezelButton(
-                        label: 'NEXT',
+                        label: 'Next',
                         trailingGlyph: '→',
                         isDark: false,
+                        width: 96,
                         height: 40,
                         onPressed: _nextWord,
                       ),
@@ -264,24 +321,27 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
                       CoterieBezelButton(
                         label: '+',
                         isDark: false,
+                        width: 40,
                         height: 40,
                         onPressed: _openAddWordModal,
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 36),
+                  const SizedBox(height: CoterieSpacing.sectionVerticalGap),
                   Container(
                     height: 1.0,
                     color: CoterieColors.hairlineBlack,
                   ),
 
-                  // 3. SAVED WORDS LIST
+                  // ==========================================================
+                  // 3. TWO-COLUMN SAVED WORDS LIST (Swiss Grid Optical Alignment)
+                  // ==========================================================
                   Expanded(
                     child: savedWords.isEmpty
                         ? const SizedBox.shrink()
                         : ListView.separated(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: EdgeInsets.zero,
                             itemCount: savedWords.length,
                             separatorBuilder: (_, _) => Container(
                               height: 1.0,
@@ -290,6 +350,9 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
                             itemBuilder: (context, index) {
                               final item = savedWords[index];
                               return InkWell(
+                                splashColor: Colors.transparent,
+                                highlightColor: Colors.transparent,
+                                hoverColor: const Color(0xFFFAFAFA),
                                 onTap: () {
                                   final idx = _words.indexOf(item);
                                   if (idx != -1) {
@@ -298,29 +361,54 @@ class _CoterieHomeScreenState extends State<CoterieHomeScreen> {
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(
-                                    vertical: 14.0,
+                                    vertical:
+                                        CoterieSpacing.listRowVerticalPadding,
                                   ),
                                   child: Row(
                                     crossAxisAlignment:
-                                        CrossAxisAlignment.baseline,
-                                    textBaseline: TextBaseline.alphabetic,
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      // Word title ONLY in Serif
+                                      // Column 1: Word Title ONLY in Serif (128px fixed grid column)
                                       SizedBox(
-                                        width: 112,
+                                        width:
+                                            CoterieSpacing.listLeftColumnWidth,
                                         child: Text(
                                           item.word,
                                           style: CoterieTypography
                                               .listWordTitleSerif,
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                      // Definition in Non-Serif
+                                      const SizedBox(
+                                        width: CoterieSpacing.listColumnGutter,
+                                      ),
+                                      // Column 2: Definition in Sans-Serif, optically offset (+4px)
+                                      // to align with the cap-height/x-height of the 26px Serif word
                                       Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: CoterieSpacing
+                                                .listOpticalTopOffset,
+                                          ),
+                                          child: Text(
+                                            item.definition,
+                                            style: CoterieTypography
+                                                .listDefinitionSans,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // Column 3: Right-aligned Part of Speech in Sans-Serif
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          top:
+                                              CoterieSpacing
+                                                  .listOpticalTopOffset +
+                                              1.0,
+                                        ),
                                         child: Text(
-                                          item.definition,
-                                          style:
-                                              CoterieTypography.definitionText,
+                                          item.partOfSpeech,
+                                          style: CoterieTypography
+                                              .partOfSpeechSans,
                                         ),
                                       ),
                                     ],

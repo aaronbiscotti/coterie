@@ -11,10 +11,14 @@ import 'package:flutter/physics.dart';
 ///    Structured differently from the top hole — a full-face rounded-rectangle
 ///    tactile button with a thin anodized outer bezel rim, recessed chamfer, and
 ///    fuzzy velvet-black (or pure white) button cap.
-/// 3. Strict Typography (`CoterieTypography`):
+/// 3. Strict Two-Family Typography (`CoterieTypography`):
 ///    - Serif (`InstrumentSerif`) ONLY for vocabulary word titles.
-///    - Non-serif (`ReceiptMono`) for definitions and button labels.
-/// 4. Strict Palette: Pure White (`#FFFFFF`) and Black (`#000000`).
+///    - Sans-serif (`EditorialSans` / Inter) for all normal text, definitions,
+///      parts of speech, and UI controls.
+///    - Receipt Mono (`ReceiptMono`) reserved solely for the physical museum ticket.
+/// 4. Swiss Grid & 8pt Spatial Rhythm (`CoterieSpacing`):
+///    - Flush-left asymmetric alignment, optical baseline offsets, and fixed
+///      vertical rhythm so controls never jump when cycling words.
 /// ============================================================================
 
 class CoterieColors {
@@ -23,14 +27,16 @@ class CoterieColors {
   // Pure White & Black for Home Screen
   static const Color pureWhite = Color(0xFFFFFFFF);
   static const Color pureBlack = Color(0xFF000000);
-  static const Color hairlineBlack = Color(0xFFE8E8E8);
+  static const Color hairlineBlack = Color(0xFFE6E6E6);
+
+  // Neutral grayscale hierarchy for sans-serif text on white
+  static const Color inkPrimary = Color(0xFF000000);
+  static const Color inkSecondary = Color(0xFF222222);
+  static const Color inkMuted = Color(0xFF737373);
 
   // Ticket paper (used only on the physical museum ticket)
   static const Color galleryWhite = Color(0xFFFFFFFF);
   static const Color archivalCream = Color(0xFFF3F0E8);
-  static const Color inkPrimary = Color(0xFF000000);
-  static const Color inkSecondary = Color(0xFF1A1A1A);
-  static const Color inkMuted = Color(0xFF666666);
 
   // Bezeled Hardware Palette (Anodized Gray Outer -> Chamfer -> Velvet Black)
   static const List<Color> outerBezelGradient = [
@@ -69,10 +75,32 @@ class CoterieColors {
   static const Color fuzzyVelvetFleck = Color(0xFF34343A);
 }
 
+/// Swiss-grid 8pt spatial scale and optical alignment constants.
+class CoterieSpacing {
+  const CoterieSpacing._();
+
+  static const double maxContentWidth = 440.0;
+  static const double pageHorizontalMargin = 32.0; // 4 * 8pt
+  static const double pageTopMargin = 48.0; // 6 * 8pt
+  static const double pageBottomMargin = 32.0; // 4 * 8pt
+
+  static const double titleToDefinitionGap = 16.0; // 2 * 8pt
+  static const double heroDefinitionHeight = 48.0; // Fixed 2-line rhythm
+  static const double definitionToActionsGap = 24.0; // 3 * 8pt
+  static const double buttonGap = 12.0; // 1.5 * 8pt
+  static const double sectionVerticalGap = 40.0; // 5 * 8pt
+
+  static const double listRowVerticalPadding = 18.0;
+  static const double listLeftColumnWidth = 128.0; // 16 * 8pt
+  static const double listColumnGutter = 24.0; // 3 * 8pt
+  static const double listOpticalTopOffset = 4.0; // Aligns 14px sans to 26px serif
+}
+
 class CoterieTypography {
   const CoterieTypography._();
 
   static const String wordTitleSerifFamily = 'InstrumentSerif';
+  static const String sansFamily = 'EditorialSans';
   static const String monoFamily = 'ReceiptMono';
 
   /// High-fashion display wordmark on ticket ("Coterie")
@@ -85,36 +113,73 @@ class CoterieTypography {
     color: Color(0xFFF7F5EE),
   );
 
-  /// SERIF ONLY FOR WORD TITLES: Large focus word title
+  /// SERIF ONLY FOR WORD TITLES: Large focus word title (56px)
   static const TextStyle heroWordTitleSerif = TextStyle(
     fontFamily: wordTitleSerifFamily,
-    fontSize: 54.0,
-    fontWeight: FontWeight.w400,
-    height: 0.95,
-    letterSpacing: 0.2,
-    color: CoterieColors.pureBlack,
-  );
-
-  /// SERIF ONLY FOR WORD TITLES: List row word title
-  static const TextStyle listWordTitleSerif = TextStyle(
-    fontFamily: wordTitleSerifFamily,
-    fontSize: 28.0,
+    fontSize: 56.0,
     fontWeight: FontWeight.w400,
     height: 1.0,
-    letterSpacing: 0.2,
+    letterSpacing: -0.4,
+    leadingDistribution: TextLeadingDistribution.even,
     color: CoterieColors.pureBlack,
   );
 
-  /// Non-serif definition & body copy
-  static const TextStyle definitionText = TextStyle(
-    fontFamily: monoFamily,
-    fontSize: 12.5,
-    height: 1.4,
-    letterSpacing: 0.1,
+  /// SERIF ONLY FOR WORD TITLES: Saved list row word title (26px)
+  static const TextStyle listWordTitleSerif = TextStyle(
+    fontFamily: wordTitleSerifFamily,
+    fontSize: 26.0,
+    fontWeight: FontWeight.w400,
+    height: 1.1,
+    letterSpacing: -0.1,
+    leadingDistribution: TextLeadingDistribution.even,
     color: CoterieColors.pureBlack,
   );
 
-  /// Physically embossed single-line uppercase label
+  /// SANS-SERIF FOR NORMAL TEXT: Hero definition copy (15px Inter)
+  static const TextStyle heroDefinitionSans = TextStyle(
+    fontFamily: sansFamily,
+    fontSize: 15.0,
+    fontWeight: FontWeight.w400,
+    height: 1.5,
+    letterSpacing: -0.15,
+    leadingDistribution: TextLeadingDistribution.even,
+    color: CoterieColors.inkSecondary,
+  );
+
+  /// SANS-SERIF FOR NORMAL TEXT: List definition copy (14px Inter)
+  static const TextStyle listDefinitionSans = TextStyle(
+    fontFamily: sansFamily,
+    fontSize: 14.0,
+    fontWeight: FontWeight.w400,
+    height: 1.45,
+    letterSpacing: -0.1,
+    leadingDistribution: TextLeadingDistribution.even,
+    color: CoterieColors.inkSecondary,
+  );
+
+  /// SANS-SERIF FOR NORMAL TEXT: Part of speech tag (13px Inter)
+  static const TextStyle partOfSpeechSans = TextStyle(
+    fontFamily: sansFamily,
+    fontSize: 13.0,
+    fontWeight: FontWeight.w400,
+    height: 1.2,
+    letterSpacing: 0.0,
+    leadingDistribution: TextLeadingDistribution.even,
+    color: CoterieColors.inkMuted,
+  );
+
+  /// SANS-SERIF FOR NORMAL TEXT: Button label (12px Inter Medium)
+  static const TextStyle buttonLabelSans = TextStyle(
+    fontFamily: sansFamily,
+    fontSize: 12.0,
+    fontWeight: FontWeight.w500,
+    height: 1.0,
+    letterSpacing: 0.4,
+    leadingDistribution: TextLeadingDistribution.even,
+    color: CoterieColors.pureBlack,
+  );
+
+  /// Physically embossed single-line uppercase label on ticket stub
   static const TextStyle embossedLabel = TextStyle(
     fontFamily: monoFamily,
     fontSize: 9.5,
@@ -132,15 +197,6 @@ class CoterieTypography {
         color: Color(0xFF000000),
       ),
     ],
-  );
-
-  /// Non-serif metadata / UI label
-  static const TextStyle receiptMeta = TextStyle(
-    fontFamily: monoFamily,
-    fontSize: 10.5,
-    letterSpacing: 0.5,
-    height: 1.25,
-    color: CoterieColors.pureBlack,
   );
 }
 
@@ -271,7 +327,7 @@ class CoterieBezelKeycapPainter extends CustomPainter {
   const CoterieBezelKeycapPainter({
     this.isDark = true,
     this.cornerRadius = 10.0,
-    this.bezelThickness = 3.2,
+    this.bezelThickness = 3.0,
     this.pressedProgress = 0.0,
   });
 
@@ -291,7 +347,7 @@ class CoterieBezelKeycapPainter extends CustomPainter {
 
     final capRect = rect
         .deflate(bezelThickness)
-        .shift(Offset(0, pressedProgress * 0.8));
+        .shift(Offset(0, pressedProgress * 0.7));
     final capRadius = math.max(2.0, cornerRadius - bezelThickness);
     final capRRect = RRect.fromRectAndRadius(
       capRect,
@@ -299,12 +355,12 @@ class CoterieBezelKeycapPainter extends CustomPainter {
     );
 
     // 1. Soft outer drop shadow
-    final shadowDy = 2.0 * (1.0 - pressedProgress * 0.6);
+    final shadowDy = 1.8 * (1.0 - pressedProgress * 0.6);
     canvas.drawRRect(
       outerRRect.shift(Offset(0, shadowDy)),
       Paint()
-        ..color = const Color(0xFF000000).withValues(alpha: 0.08)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.5),
+        ..color = const Color(0xFF000000).withValues(alpha: 0.07)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
     );
 
     // 2. Anodized outer bezel frame
@@ -336,10 +392,10 @@ class CoterieBezelKeycapPainter extends CustomPainter {
     if (isDark) {
       // 4A. Fuzzy black edge feather
       canvas.drawRRect(
-        capRRect.inflate(0.9),
+        capRRect.inflate(0.8),
         Paint()
           ..color = CoterieColors.fuzzyBlackFeather.withValues(alpha: 0.80)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.4),
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2),
       );
 
       // 5A. Full-face velvet-black button keycap
@@ -354,7 +410,7 @@ class CoterieBezelKeycapPainter extends CustomPainter {
       final dotPaint = Paint();
       canvas.save();
       canvas.clipRRect(capRRect);
-      for (int i = 0; i < 120; i++) {
+      for (int i = 0; i < 90; i++) {
         final fx = capRect.left + rng.nextDouble() * capRect.width;
         final fy = capRect.top + rng.nextDouble() * capRect.height;
         dotPaint.color = CoterieColors.fuzzyVelvetFleck
@@ -383,6 +439,7 @@ class CoterieBezelKeycapPainter extends CustomPainter {
 }
 
 /// Interactive hardware-bezel button (structured as a button cap, not a hole).
+/// Uses clean sans-serif typography (`EditorialSans`) and optical centering.
 class CoterieBezelButton extends StatefulWidget {
   final String label;
   final String? trailingGlyph;
@@ -398,7 +455,7 @@ class CoterieBezelButton extends StatefulWidget {
     required this.onPressed,
     this.trailingGlyph,
     this.width,
-    this.height = 44.0,
+    this.height = 40.0,
     this.isDark = true,
     this.cornerRadius = 10.0,
   });
@@ -472,8 +529,8 @@ class _CoterieBezelButtonState extends State<CoterieBezelButton>
           animation: _pressController,
           builder: (context, child) {
             final p = _pressController.value.clamp(-0.25, 1.25);
-            final scale = 1.0 - (p * 0.032);
-            final dy = p * 1.2;
+            final scale = 1.0 - (p * 0.03);
+            final dy = p * 1.1;
             return Transform.translate(
               offset: Offset(0, dy),
               child: Transform.scale(
@@ -485,7 +542,7 @@ class _CoterieBezelButtonState extends State<CoterieBezelButton>
                     painter: CoterieBezelKeycapPainter(
                       isDark: widget.isDark,
                       cornerRadius: widget.cornerRadius,
-                      bezelThickness: 3.2,
+                      bezelThickness: 3.0,
                       pressedProgress: p.clamp(0.0, 1.0),
                     ),
                     child: child,
@@ -494,38 +551,32 @@ class _CoterieBezelButtonState extends State<CoterieBezelButton>
               ),
             );
           },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  widget.label,
-                  style: widget.isDark
-                      ? CoterieTypography.embossedLabel.copyWith(
-                          fontSize: 10.5,
-                          letterSpacing: 1.2,
-                          color: textColor,
-                        )
-                      : CoterieTypography.receiptMeta.copyWith(
-                          fontSize: 10.5,
-                          letterSpacing: 1.1,
-                          color: textColor,
-                        ),
-                ),
-                if (widget.trailingGlyph != null) ...[
-                  const SizedBox(width: 8),
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: widget.width != null ? 0.0 : 18.0,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
                   Text(
-                    widget.trailingGlyph!,
-                    style: TextStyle(
-                      fontFamily: CoterieTypography.monoFamily,
-                      fontSize: 11.5,
+                    widget.label,
+                    style: CoterieTypography.buttonLabelSans.copyWith(
                       color: textColor,
                     ),
                   ),
+                  if (widget.trailingGlyph != null) ...[
+                    const SizedBox(width: 6),
+                    Text(
+                      widget.trailingGlyph!,
+                      style: CoterieTypography.buttonLabelSans.copyWith(
+                        color: textColor,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
