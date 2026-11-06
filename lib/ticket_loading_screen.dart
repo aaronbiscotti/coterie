@@ -43,18 +43,22 @@ class TicketLoadingScreen extends StatefulWidget {
 class _TicketLoadingScreenState extends State<TicketLoadingScreen>
     with TickerProviderStateMixin {
   static const double _ticketW = 256.0;
-  static const double _ticketH = 640.0;
-  static const double _notchY = 114.0;
+  // Extra 28px at the top of the stub stays permanently tucked inside the black slit rollers
+  // so dragging or tilting the ticket never exposes its top edge outside the slit.
+  static const double _tuckedTopBleed = 28.0;
+  static const double _ticketH = 668.0;
+  static const double _notchY = 142.0; // 114px visible below slit + 28px tucked inside slit
   static const double _notchDepth = 14.0;
   static const double _notchHalfHeight = 13.0;
 
   late final AnimationController _printController;
-  late final AnimationController _settleSpringXController;
-  late final AnimationController _settleSpringYController;
+  late final AnimationController _settleTiltController;
+  late final AnimationController _settlePullController;
   late final AnimationController _ripDetachController;
 
-  // Whole-ticket drag offset when dragging anywhere OTHER than the cut section
-  Offset _ticketDragOffset = Offset.zero;
+  // Taut slight pull + tilt state when dragging anywhere OUTSIDE the cut section
+  double _dragPullY = 0.0; // Clamped to a slight 0..9px tug so it stays in the slit
+  double _dragTiltAngle = 0.0; // Pivots around the slit throat
   bool _isDraggingTicket = false;
 
   // Cut-section horizontal swipe-to-rip state (ONLY triggered around _notchY)
@@ -71,8 +75,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       duration: const Duration(milliseconds: 2400),
     );
 
-    _settleSpringXController = AnimationController.unbounded(vsync: this);
-    _settleSpringYController = AnimationController.unbounded(vsync: this);
+    _settleTiltController = AnimationController.unbounded(vsync: this);
+    _settlePullController = AnimationController.unbounded(vsync: this);
 
     _ripDetachController = AnimationController(
       vsync: this,
@@ -86,8 +90,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
           stiffness: 380.0,
           damping: 23.0,
         );
-        final sim = SpringSimulation(spring, -5.0, 0.0, 110.0);
-        _settleSpringYController.animateWith(sim);
+        final sim = SpringSimulation(spring, -4.5, 0.0, 95.0);
+        _settlePullController.animateWith(sim);
       }
     });
 
@@ -114,13 +118,14 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   }
 
   void _resetAndReprint() {
-    _settleSpringXController.stop();
-    _settleSpringYController.stop();
-    _settleSpringXController.value = 0.0;
-    _settleSpringYController.value = 0.0;
+    _settleTiltController.stop();
+    _settlePullController.stop();
+    _settleTiltController.value = 0.0;
+    _settlePullController.value = 0.0;
     _ripDetachController.reset();
     setState(() {
-      _ticketDragOffset = Offset.zero;
+      _dragPullY = 0.0;
+      _dragTiltAngle = 0.0;
       _isDraggingTicket = false;
       _tearProgress = 0.0;
       _isRippedOff = false;
@@ -129,59 +134,62 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   }
 
   // ---------------------------------------------------------------------------
-  // 1. WHOLE-TICKET MOVE GESTURE (Triggered anywhere OUTSIDE the cut section)
+  // 1. WHOLE-TICKET SLIGHT PULL & TILT (Triggered anywhere OUTSIDE cut section)
+  //    The ticket stays anchored inside the slit rollers — it pulls out just
+  //    slightly (max ~9px) and tilts around the slit aperture.
   // ---------------------------------------------------------------------------
   void _onTicketMoveStart(DragStartDetails details) {
     if (_printController.isAnimating) return;
-    _settleSpringXController.stop();
-    _settleSpringYController.stop();
+    _settleTiltController.stop();
+    _settlePullController.stop();
     setState(() {
       _isDraggingTicket = true;
-      _ticketDragOffset = Offset(
-        _settleSpringXController.value,
-        _settleSpringYController.value,
-      );
+      _dragTiltAngle = _settleTiltController.value;
+      _dragPullY = _settlePullController.value;
     });
   }
 
   void _onTicketMoveUpdate(DragUpdateDetails details) {
     if (_printController.isAnimating) return;
     setState(() {
-      // Physical resistance so moving the ticket feels tactile and anchored in the slit
-      final nextDx = (_ticketDragOffset.dx + details.delta.dx * 0.65)
-          .clamp(-72.0, 72.0);
-      final nextDy = (_ticketDragOffset.dy + details.delta.dy * 0.65)
-          .clamp(-24.0, 96.0);
-      _ticketDragOffset = Offset(nextDx, nextDy);
+      // Taut rubber-band vertical give: only pulls out slightly (-3px to +9px)
+      // so the ticket never detaches or pulls out of the slit.
+      final nextPull = (_dragPullY + details.delta.dy * 0.16).clamp(-3.0, 9.0);
+      // Smooth rotational tilt anchored at the slit throat
+      final nextTilt = (_dragTiltAngle - details.delta.dx * 0.0018)
+          .clamp(-0.11, 0.11);
+      _dragPullY = nextPull;
+      _dragTiltAngle = nextTilt;
     });
   }
 
   void _onTicketMoveEnd(DragEndDetails details) {
     if (!_isDraggingTicket) return;
-    final startOffset = _ticketDragOffset;
+    final startTilt = _dragTiltAngle;
+    final startPull = _dragPullY;
     setState(() {
       _isDraggingTicket = false;
     });
 
     const spring = SpringDescription(
       mass: 1.0,
-      stiffness: 360.0,
+      stiffness: 380.0,
       damping: 22.0,
     );
-    _settleSpringXController.animateWith(
+    _settleTiltController.animateWith(
       SpringSimulation(
         spring,
-        startOffset.dx,
+        startTilt,
         0.0,
-        details.velocity.pixelsPerSecond.dx * 0.25,
+        -details.velocity.pixelsPerSecond.dx * 0.0004,
       ),
     );
-    _settleSpringYController.animateWith(
+    _settlePullController.animateWith(
       SpringSimulation(
         spring,
-        startOffset.dy,
+        startPull,
         0.0,
-        details.velocity.pixelsPerSecond.dy * 0.25,
+        details.velocity.pixelsPerSecond.dy * 0.04,
       ),
     );
   }
@@ -229,8 +237,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       stiffness: 460.0,
       damping: 22.0,
     );
-    _settleSpringYController.animateWith(
-      SpringSimulation(stubSpring, -4.5, 0.0, -90.0),
+    _settlePullController.animateWith(
+      SpringSimulation(stubSpring, -3.5, 0.0, -70.0),
     );
     _ripDetachController.forward(from: 0.0);
   }
@@ -238,8 +246,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   @override
   void dispose() {
     _printController.dispose();
-    _settleSpringXController.dispose();
-    _settleSpringYController.dispose();
+    _settleTiltController.dispose();
+    _settlePullController.dispose();
     _ripDetachController.dispose();
     super.dispose();
   }
@@ -250,6 +258,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       child: _TopStubContent(
         width: _ticketW,
         height: _notchY,
+        topBleed: _tuckedTopBleed,
       ),
     );
 
@@ -267,9 +276,11 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
           builder: (context, constraints) {
             const double slitW = 324.0;
             const double slitH = 36.0;
+            const double visibleTicketH = _ticketH - _tuckedTopBleed;
 
             final double scale =
-                (constraints.maxHeight / (_ticketH + 76.0)).clamp(0.68, 1.04);
+                (constraints.maxHeight / (visibleTicketH + 76.0))
+                    .clamp(0.68, 1.04);
 
             return Center(
               child: Transform.scale(
@@ -277,56 +288,54 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                 alignment: Alignment.center,
                 child: SizedBox(
                   width: slitW + 120,
-                  height: _ticketH + 68,
+                  height: visibleTicketH + 68,
                   child: Stack(
                     alignment: Alignment.topCenter,
                     clipBehavior: Clip.none,
                     children: [
-                      // 1. Static hyperrealistic slit backplate (RepaintBoundary = zero flicker)
+                      // 1. Unified single-pass hyperrealistic slit (no split overlay = zero horizontal gray line)
                       const Positioned(
                         top: 8,
                         child: RepaintBoundary(
                           child: CustomPaint(
                             size: Size(slitW, slitH),
-                            painter: _HyperrealisticSlitPainter(
-                              isUpperOverlayOnly: false,
-                            ),
+                            painter: _HyperrealisticSlitPainter(),
                           ),
                         ),
                       ),
 
-                      // 2. Masked ticket aperture strictly below the slit throat centerline
+                      // 2. Masked ticket aperture starting inside the black throat (top: 24)
                       Positioned(
-                        top: 26,
+                        top: 24,
                         left: 0,
                         right: 0,
-                        height: _ticketH + 42,
+                        height: visibleTicketH + 44,
                         child: ClipRect(
                           child: AnimatedBuilder(
                             animation: Listenable.merge([
                               _printController,
-                              _settleSpringXController,
-                              _settleSpringYController,
+                              _settleTiltController,
+                              _settlePullController,
                               _ripDetachController,
                             ]),
                             builder: (context, _) {
                               final progress = const TicketFeedCurve()
                                   .transform(_printController.value);
 
-                              final moveDx = _isDraggingTicket
-                                  ? _ticketDragOffset.dx
-                                  : _settleSpringXController.value;
-                              final moveDy = _isDraggingTicket
-                                  ? _ticketDragOffset.dy
-                                  : _settleSpringYController.value;
+                              final pullDy = _isDraggingTicket
+                                  ? _dragPullY
+                                  : _settlePullController.value;
+                              final tiltAngle = _isDraggingTicket
+                                  ? _dragTiltAngle
+                                  : _settleTiltController.value;
 
-                              const double hiddenTravel = _ticketH + 10.0;
-                              final double baseDy =
-                                  -hiddenTravel * (1.0 - progress) + moveDy;
-
-                              // Subtle pendulum tilt when moving the whole ticket horizontally
-                              final double moveTiltAngle =
-                                  (moveDx / 320.0).clamp(-0.09, 0.09);
+                              // At progress == 1.0, baseDy is -_tuckedTopBleed (-28px),
+                              // keeping the top 28px of the ticket permanently inside the black slit throat
+                              // even when pulled down slightly (+9px) or tilted!
+                              const double hiddenTravel = visibleTicketH + 12.0;
+                              final double baseDy = -_tuckedTopBleed -
+                                  hiddenTravel * (1.0 - progress) +
+                                  pullDy;
 
                               // Rip detachment physics
                               final double ripT = const Cubic(
@@ -350,17 +359,18 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                               return Align(
                                 alignment: Alignment.topCenter,
                                 child: Transform.translate(
-                                  offset: Offset(moveDx, baseDy),
+                                  offset: Offset(0.0, baseDy),
                                   child: Transform.rotate(
-                                    alignment: Alignment.topCenter,
-                                    angle: moveTiltAngle,
+                                    // Pivot right at the slit throat line
+                                    alignment: const Alignment(0.0, -0.92),
+                                    angle: tiltAngle,
                                     child: SizedBox(
                                       width: _ticketW,
                                       height: _ticketH,
                                       child: Stack(
                                         clipBehavior: Clip.none,
                                         children: [
-                                          // A. TOP TAG STUB (0 .. _notchY) — Dragging here moves the ticket
+                                          // A. TOP TAG STUB (0 .. _notchY)
                                           Positioned(
                                             top: 0,
                                             left: 0,
@@ -397,7 +407,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                                             ),
                                           ),
 
-                                          // B. LOWER TICKET BODY (_notchY .. _ticketH) — Dragging here moves the ticket
+                                          // B. LOWER TICKET BODY (_notchY .. _ticketH)
                                           if (lowerOpacity > 0.0)
                                             Positioned(
                                               top: _notchY + tearGap,
@@ -466,7 +476,6 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                                             ),
 
                                           // D. DEDICATED CUT-SECTION SWIPE ZONE (ONLY around _notchY ± 24px)
-                                          // Swiping horizontally here rips the tag off; dragging anywhere else moves the ticket!
                                           if (!_isRippedOff)
                                             Positioned(
                                               top: _notchY - 24.0,
@@ -495,21 +504,6 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                           ),
                         ),
                       ),
-
-                      // 3. Static upper bezel overhang lip so the ticket emerges from inside the fuzzy black throat
-                      const Positioned(
-                        top: 8,
-                        child: IgnorePointer(
-                          child: RepaintBoundary(
-                            child: CustomPaint(
-                              size: Size(slitW, slitH),
-                              painter: _HyperrealisticSlitPainter(
-                                isUpperOverlayOnly: true,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
@@ -523,22 +517,25 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
 }
 
 /// Top section above the V-notch cut line:
-/// Low-brightness moody weather/cloud background + "Coterie" in a distinct high-fashion
-/// display serif (Instrument Serif) + a single line of physically embossed text.
+/// Includes `topBleed` tucked inside the black slit throat so no top edge or gray line
+/// is ever visible when pulling or tilting the ticket.
 class _TopStubContent extends StatelessWidget {
   final double width;
   final double height;
+  final double topBleed;
 
   const _TopStubContent({
     required this.width,
     required this.height,
+    required this.topBleed,
   });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return Container(
       width: width,
       height: height,
+      color: const Color(0xFF0A0A0C),
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -551,7 +548,7 @@ class _TopStubContent extends StatelessWidget {
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+            padding: EdgeInsets.fromLTRB(18, topBleed + 16, 18, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -622,8 +619,6 @@ class _TopStubContent extends StatelessWidget {
   }
 }
 
-/// Renders a single line of physically embossed text with top-left specular bevel highlight
-/// and bottom-right recessed stamp shadow.
 class _EmbossedSingleLineText extends StatelessWidget {
   final String text;
 
@@ -657,10 +652,6 @@ class _EmbossedSingleLineText extends StatelessWidget {
   }
 }
 
-/// Lower ticket body below the V-notch cut line:
-/// 1. Purely cropped 1:1 aspect-ratio 16th-century Dutch portrait (256x144 = 16:9, zero squishing)
-/// 2. Clean archival cream field with 90° vertical Niloofar Serif + ReceiptMono ticket metadata
-/// 3. Bottom Barcode + ReceiptMono serial
 class _LowerTicketBodyContent extends StatelessWidget {
   final double width;
   final double height;
@@ -679,7 +670,6 @@ class _LowerTicketBodyContent extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Tactile cotton cardstock paper texture
           Opacity(
             opacity: 0.65,
             child: Image.asset(
@@ -747,7 +737,7 @@ class _LowerTicketBodyContent extends StatelessWidget {
                         ),
                       ),
 
-                      // Right vertical column: ReceiptMono POS ticket metadata (Louvre-style)
+                      // Right vertical column: ReceiptMono POS ticket metadata
                       Align(
                         alignment: Alignment.bottomRight,
                         child: RotatedBox(
@@ -835,13 +825,10 @@ class _TopStubClipper extends CustomClipper<Path> {
 
   @override
   Path getClip(Size size) {
-    const double r = 1.5;
     final path = Path();
 
-    path.moveTo(0, r);
-    path.quadraticBezierTo(0, 0, r, 0);
-    path.lineTo(size.width - r, 0);
-    path.quadraticBezierTo(size.width, 0, size.width, r);
+    path.moveTo(0, 0);
+    path.lineTo(size.width, 0);
 
     path.lineTo(size.width, size.height - notchHalfHeight);
     path.lineTo(size.width - notchDepth, size.height);
@@ -963,7 +950,9 @@ class _StubShadowPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
+    final rect = isTopStub
+        ? Rect.fromLTWH(0, 28, size.width, size.height - 28)
+        : (Offset.zero & size);
     canvas.drawRect(
       rect.shift(const Offset(0, 4)),
       Paint()
@@ -1020,10 +1009,9 @@ class _DynamicPerforationPainter extends CustomPainter {
   }
 }
 
+/// Unified single-pass hyperrealistic slit painter (no horizontal split line).
 class _HyperrealisticSlitPainter extends CustomPainter {
-  final bool isUpperOverlayOnly;
-
-  const _HyperrealisticSlitPainter({required this.isUpperOverlayOnly});
+  const _HyperrealisticSlitPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1042,92 +1030,22 @@ class _HyperrealisticSlitPainter extends CustomPainter {
     final throatRect = Rect.fromCenter(
       center: Offset(size.width / 2, size.height / 2 + 0.5),
       width: size.width - 26.0,
-      height: size.height - 17.0,
+      height: size.height - 15.0,
     );
     final throatRRect = RRect.fromRectAndRadius(
       throatRect,
       Radius.circular(throatRect.height / 2),
     );
 
-    if (!isUpperOverlayOnly) {
-      canvas.drawRRect(
-        outerRRect.shift(const Offset(0, 3.0)),
-        Paint()
-          ..color = const Color(0xFF000000).withValues(alpha: 0.10)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0),
-      );
+    // Soft outer elevation shadow on the white background
+    canvas.drawRRect(
+      outerRRect.shift(const Offset(0, 3.0)),
+      Paint()
+        ..color = const Color(0xFF000000).withValues(alpha: 0.10)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0),
+    );
 
-      final outerGradient = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFFE7E6E2),
-          Color(0xFFD6D5D0),
-          Color(0xFFC5C4BE),
-          Color(0xFFDDDDD8),
-        ],
-        stops: [0.0, 0.45, 0.80, 1.0],
-      ).createShader(rect);
-      canvas.drawRRect(outerRRect, Paint()..shader = outerGradient);
-
-      canvas.drawRRect(
-        outerRRect.deflate(0.5),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0
-          ..color = const Color(0xFFB8B7B0),
-      );
-
-      final bevelGradient = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFF8E8D87),
-          Color(0xFFB5B4AE),
-          Color(0xFFDEDDD8),
-          Color(0xFFF4F4F1),
-        ],
-        stops: [0.0, 0.35, 0.72, 1.0],
-      ).createShader(bevelRect);
-      canvas.drawRRect(bevelRRect, Paint()..shader = bevelGradient);
-
-      canvas.drawRRect(
-        throatRRect.inflate(2.2),
-        Paint()
-          ..color = const Color(0xFF1D1D20).withValues(alpha: 0.80)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
-      );
-
-      final throatShader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Color(0xFF040405),
-          Color(0xFF0B0B0E),
-          Color(0xFF16161A),
-          Color(0xFF070709),
-        ],
-      ).createShader(throatRect);
-      canvas.drawRRect(throatRRect, Paint()..shader = throatShader);
-
-      final rng = math.Random(42);
-      final dotPaint = Paint();
-      canvas.save();
-      canvas.clipRRect(throatRRect);
-      for (int i = 0; i < 220; i++) {
-        final fx = throatRect.left + rng.nextDouble() * throatRect.width;
-        final fy = throatRect.top + rng.nextDouble() * throatRect.height;
-        dotPaint.color = const Color(0xFF34343A)
-            .withValues(alpha: 0.08 + rng.nextDouble() * 0.12);
-        canvas.drawCircle(Offset(fx, fy), 0.6, dotPaint);
-      }
-      canvas.restore();
-      return;
-    }
-
-    canvas.save();
-    canvas.clipRect(Rect.fromLTWH(0, 0, size.width, size.height * 0.50));
-
+    // Outer gray rounded border housing
     final outerGradient = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -1141,6 +1059,15 @@ class _HyperrealisticSlitPainter extends CustomPainter {
     ).createShader(rect);
     canvas.drawRRect(outerRRect, Paint()..shader = outerGradient);
 
+    canvas.drawRRect(
+      outerRRect.deflate(0.5),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0
+        ..color = const Color(0xFFB8B7B0),
+    );
+
+    // Inner recessed bevel
     final bevelGradient = const LinearGradient(
       begin: Alignment.topCenter,
       end: Alignment.bottomCenter,
@@ -1154,13 +1081,38 @@ class _HyperrealisticSlitPainter extends CustomPainter {
     ).createShader(bevelRect);
     canvas.drawRRect(bevelRRect, Paint()..shader = bevelGradient);
 
+    // Fuzzy black interior feather
     canvas.drawRRect(
-      throatRRect.inflate(1.8),
+      throatRRect.inflate(2.4),
       Paint()
-        ..color = const Color(0xFF18181B).withValues(alpha: 0.85)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+        ..color = const Color(0xFF19191C).withValues(alpha: 0.85)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.2),
     );
-    canvas.drawRRect(throatRRect, Paint()..color = const Color(0xFF060608));
+
+    // Deep fuzzy black cavity
+    final throatShader = const LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Color(0xFF040405),
+        Color(0xFF09090B),
+        Color(0xFF101013),
+        Color(0xFF050507),
+      ],
+    ).createShader(throatRect);
+    canvas.drawRRect(throatRRect, Paint()..shader = throatShader);
+
+    final rng = math.Random(42);
+    final dotPaint = Paint();
+    canvas.save();
+    canvas.clipRRect(throatRRect);
+    for (int i = 0; i < 220; i++) {
+      final fx = throatRect.left + rng.nextDouble() * throatRect.width;
+      final fy = throatRect.top + rng.nextDouble() * throatRect.height;
+      dotPaint.color = const Color(0xFF34343A)
+          .withValues(alpha: 0.08 + rng.nextDouble() * 0.12);
+      canvas.drawCircle(Offset(fx, fy), 0.6, dotPaint);
+    }
     canvas.restore();
   }
 
