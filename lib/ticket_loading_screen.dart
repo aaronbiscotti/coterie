@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
+import 'coterie_style_guide.dart';
+import 'home_screen.dart';
 
 /// Multi-phase thermal ticket feed curve inspired by:
 /// - Nintendo (Masahiro Sakurai): Initial mechanical bite + brief frame-data pause
@@ -10,9 +12,9 @@ import 'package:flutter/physics.dart';
 class TicketFeedCurve extends Curve {
   const TicketFeedCurve();
 
-  static const Cubic _biteCurve = Cubic(0.23, 1.0, 0.32, 1.0);
-  static const Cubic _primaryFeed = Cubic(0.16, 1.0, 0.30, 1.0);
-  static const Cubic _finalEject = Cubic(0.32, 0.72, 0.0, 1.0);
+  static const Cubic _biteCurve = CoterieMotion.snappyOut;
+  static const Cubic _primaryFeed = CoterieMotion.primaryDecel;
+  static const Cubic _finalEject = CoterieMotion.sheetTransition;
 
   @override
   double transformInternal(double t) {
@@ -55,9 +57,11 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   late final AnimationController _settleTiltController;
   late final AnimationController _settlePullController;
   late final AnimationController _ripDetachController;
+  late final AnimationController _buttonAppearController;
+  late final AnimationController _pushToHomeController;
 
   // Taut slight pull + tilt state when dragging anywhere OUTSIDE the cut section
-  double _dragPullY = 0.0; // Clamped to a slight 0..9px tug so it stays in the slit
+  double _dragPullY = 0.0; // Clamped to a slight -3..9px tug so it stays in the slit
   double _dragTiltAngle = 0.0; // Pivots around the slit throat
   bool _isDraggingTicket = false;
 
@@ -80,7 +84,17 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
 
     _ripDetachController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 680),
+      duration: const Duration(milliseconds: 640),
+    );
+
+    _buttonAppearController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+
+    _pushToHomeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 660),
     );
 
     _printController.addStatusListener((status) {
@@ -123,6 +137,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
     _settleTiltController.value = 0.0;
     _settlePullController.value = 0.0;
     _ripDetachController.reset();
+    _buttonAppearController.reset();
     setState(() {
       _dragPullY = 0.0;
       _dragTiltAngle = 0.0;
@@ -131,6 +146,14 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       _isRippedOff = false;
     });
     _printController.forward(from: 0.0);
+  }
+
+  void _triggerPushUpToHome() {
+    _pushToHomeController.forward();
+  }
+
+  void _returnFromHomeToTicket() {
+    _pushToHomeController.reverse();
   }
 
   // ---------------------------------------------------------------------------
@@ -152,10 +175,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   void _onTicketMoveUpdate(DragUpdateDetails details) {
     if (_printController.isAnimating) return;
     setState(() {
-      // Taut rubber-band vertical give: only pulls out slightly (-3px to +9px)
-      // so the ticket never detaches or pulls out of the slit.
       final nextPull = (_dragPullY + details.delta.dy * 0.16).clamp(-3.0, 9.0);
-      // Smooth rotational tilt anchored at the slit throat
       final nextTilt = (_dragTiltAngle - details.delta.dx * 0.0018)
           .clamp(-0.11, 0.11);
       _dragPullY = nextPull;
@@ -171,11 +191,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       _isDraggingTicket = false;
     });
 
-    const spring = SpringDescription(
-      mass: 1.0,
-      stiffness: 380.0,
-      damping: 22.0,
-    );
+    const spring = CoterieMotion.snappySpring;
     _settleTiltController.animateWith(
       SpringSimulation(
         spring,
@@ -241,6 +257,11 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       SpringSimulation(stubSpring, -3.5, 0.0, -70.0),
     );
     _ripDetachController.forward(from: 0.0);
+    Future.delayed(const Duration(milliseconds: 150), () {
+      if (mounted && _isRippedOff) {
+        _buttonAppearController.forward(from: 0.0);
+      }
+    });
   }
 
   @override
@@ -249,6 +270,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
     _settleTiltController.dispose();
     _settlePullController.dispose();
     _ripDetachController.dispose();
+    _buttonAppearController.dispose();
+    _pushToHomeController.dispose();
     super.dispose();
   }
 
@@ -270,247 +293,383 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFFF),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            const double slitW = 324.0;
-            const double slitH = 36.0;
-            const double visibleTicketH = _ticketH - _tuckedTopBleed;
+      backgroundColor: CoterieColors.galleryWhite,
+      body: AnimatedBuilder(
+        animation: _pushToHomeController,
+        builder: (context, _) {
+          // Snappy sheet push curve that pushes the entire ticket screen upward
+          // while pushing CoterieHomeScreen up from the bottom.
+          final double pushT = CoterieMotion.sheetTransition.transform(
+            _pushToHomeController.value,
+          );
+          final screenH = MediaQuery.sizeOf(context).height;
 
-            final double scale =
-                (constraints.maxHeight / (visibleTicketH + 76.0))
-                    .clamp(0.68, 1.04);
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // 1. TICKET LOADING SCREEN (Pushed upward as pushT -> 1.0)
+              if (pushT < 1.0)
+                Transform.translate(
+                  offset: Offset(0.0, -screenH * pushT),
+                  child: SafeArea(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        const double slitW = 324.0;
+                        const double slitH = 36.0;
+                        const double visibleTicketH =
+                            _ticketH - _tuckedTopBleed;
 
-            return Center(
-              child: Transform.scale(
-                scale: scale,
-                alignment: Alignment.center,
-                child: SizedBox(
-                  width: slitW + 120,
-                  height: visibleTicketH + 68,
-                  child: Stack(
-                    alignment: Alignment.topCenter,
-                    clipBehavior: Clip.none,
-                    children: [
-                      // 1. Unified single-pass hyperrealistic slit (no split overlay = zero horizontal gray line)
-                      const Positioned(
-                        top: 8,
-                        child: RepaintBoundary(
-                          child: CustomPaint(
-                            size: Size(slitW, slitH),
-                            painter: _HyperrealisticSlitPainter(),
-                          ),
-                        ),
-                      ),
+                        final double scale =
+                            (constraints.maxHeight / (visibleTicketH + 76.0))
+                                .clamp(0.68, 1.04);
 
-                      // 2. Masked ticket aperture starting inside the black throat (top: 24)
-                      Positioned(
-                        top: 24,
-                        left: 0,
-                        right: 0,
-                        height: visibleTicketH + 44,
-                        child: ClipRect(
-                          child: AnimatedBuilder(
-                            animation: Listenable.merge([
-                              _printController,
-                              _settleTiltController,
-                              _settlePullController,
-                              _ripDetachController,
-                            ]),
-                            builder: (context, _) {
-                              final progress = const TicketFeedCurve()
-                                  .transform(_printController.value);
-
-                              final pullDy = _isDraggingTicket
-                                  ? _dragPullY
-                                  : _settlePullController.value;
-                              final tiltAngle = _isDraggingTicket
-                                  ? _dragTiltAngle
-                                  : _settleTiltController.value;
-
-                              // At progress == 1.0, baseDy is -_tuckedTopBleed (-28px),
-                              // keeping the top 28px of the ticket permanently inside the black slit throat
-                              // even when pulled down slightly (+9px) or tilted!
-                              const double hiddenTravel = visibleTicketH + 12.0;
-                              final double baseDy = -_tuckedTopBleed -
-                                  hiddenTravel * (1.0 - progress) +
-                                  pullDy;
-
-                              // Rip detachment physics
-                              final double ripT = const Cubic(
-                                0.22,
-                                1.0,
-                                0.36,
-                                1.0,
-                              ).transform(_ripDetachController.value);
-
-                              final double tearGap =
-                                  (_tearProgress * 10.0) + (ripT * 115.0);
-                              final double tearDx =
-                                  (_tearLeftToRight ? 1.0 : -1.0) *
-                                  ((_tearProgress * 4.0) + (ripT * 28.0));
-                              final double tearAngle =
-                                  (_tearLeftToRight ? 1.0 : -1.0) *
-                                  ((_tearProgress * 0.035) + (ripT * 0.11));
-                              final double lowerOpacity =
-                                  (1.0 - (ripT * 1.15)).clamp(0.0, 1.0);
-
-                              return Align(
+                        return Center(
+                          child: Transform.scale(
+                            scale: scale,
+                            alignment: Alignment.center,
+                            child: SizedBox(
+                              width: slitW + 120,
+                              height: visibleTicketH + 68,
+                              child: Stack(
                                 alignment: Alignment.topCenter,
-                                child: Transform.translate(
-                                  offset: Offset(0.0, baseDy),
-                                  child: Transform.rotate(
-                                    // Pivot right at the slit throat line
-                                    alignment: const Alignment(0.0, -0.92),
-                                    angle: tiltAngle,
-                                    child: SizedBox(
-                                      width: _ticketW,
-                                      height: _ticketH,
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          // A. TOP TAG STUB (0 .. _notchY)
-                                          Positioned(
-                                            top: 0,
-                                            left: 0,
-                                            width: _ticketW,
-                                            height: _notchY,
-                                            child: GestureDetector(
-                                              behavior: HitTestBehavior.opaque,
-                                              onPanStart: _onTicketMoveStart,
-                                              onPanUpdate: _onTicketMoveUpdate,
-                                              onPanEnd: _onTicketMoveEnd,
-                                              onTap: _isRippedOff
-                                                  ? _resetAndReprint
-                                                  : null,
-                                              child: CustomPaint(
-                                                painter:
-                                                    const _StubShadowPainter(
-                                                  isTopStub: true,
-                                                  notchDepth: _notchDepth,
-                                                  notchHalfHeight:
-                                                      _notchHalfHeight,
-                                                ),
-                                                child: ClipPath(
-                                                  clipper: _TopStubClipper(
-                                                    notchDepth: _notchDepth,
-                                                    notchHalfHeight:
-                                                        _notchHalfHeight,
-                                                    tearProgress: _tearProgress,
-                                                    leftToRight:
-                                                        _tearLeftToRight,
-                                                  ),
-                                                  child: cachedTopStub,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
+                                clipBehavior: Clip.none,
+                                children: [
+                                  // A. Unified single-pass hyperrealistic slit (Style Guide Painter)
+                                  const Positioned(
+                                    top: 8,
+                                    child: RepaintBoundary(
+                                      child: CustomPaint(
+                                        size: Size(slitW, slitH),
+                                        painter: CoterieBezelAperturePainter(
+                                          bevelInset: 4.2,
+                                          throatHorizontalInset: 26.0,
+                                          throatVerticalInset: 15.0,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
 
-                                          // B. LOWER TICKET BODY (_notchY .. _ticketH)
-                                          if (lowerOpacity > 0.0)
-                                            Positioned(
-                                              top: _notchY + tearGap,
-                                              left: tearDx,
-                                              width: _ticketW,
-                                              height: _ticketH - _notchY,
-                                              child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.opaque,
-                                                onPanStart: _onTicketMoveStart,
-                                                onPanUpdate:
-                                                    _onTicketMoveUpdate,
-                                                onPanEnd: _onTicketMoveEnd,
-                                                child: Opacity(
-                                                  opacity: lowerOpacity,
+                                  // B. Masked ticket aperture starting inside the black throat (top: 24)
+                                  Positioned(
+                                    top: 24,
+                                    left: 0,
+                                    right: 0,
+                                    height: visibleTicketH + 44,
+                                    child: ClipRect(
+                                      child: AnimatedBuilder(
+                                        animation: Listenable.merge([
+                                          _printController,
+                                          _settleTiltController,
+                                          _settlePullController,
+                                          _ripDetachController,
+                                          _buttonAppearController,
+                                        ]),
+                                        builder: (context, _) {
+                                          final progress =
+                                              const TicketFeedCurve().transform(
+                                                _printController.value,
+                                              );
+
+                                          final pullDy = _isDraggingTicket
+                                              ? _dragPullY
+                                              : _settlePullController.value;
+                                          final tiltAngle = _isDraggingTicket
+                                              ? _dragTiltAngle
+                                              : _settleTiltController.value;
+
+                                          const double hiddenTravel =
+                                              visibleTicketH + 12.0;
+                                          final double baseDy =
+                                              -_tuckedTopBleed -
+                                              hiddenTravel * (1.0 - progress) +
+                                              pullDy;
+
+                                          // Rip detachment physics
+                                          final double ripT =
+                                              CoterieMotion.snappyOut.transform(
+                                                _ripDetachController.value,
+                                              );
+
+                                          final double tearGap =
+                                              (_tearProgress * 10.0) +
+                                              (ripT * 130.0);
+                                          final double tearDx =
+                                              (_tearLeftToRight ? 1.0 : -1.0) *
+                                              ((_tearProgress * 4.0) +
+                                                  (ripT * 30.0));
+                                          final double tearAngle =
+                                              (_tearLeftToRight ? 1.0 : -1.0) *
+                                              ((_tearProgress * 0.035) +
+                                                  (ripT * 0.12));
+                                          final double lowerOpacity =
+                                              (1.0 - (ripT * 1.25)).clamp(
+                                                0.0,
+                                                1.0,
+                                              );
+
+                                          // Post-cut Bezel Button entrance curve
+                                          final double btnT =
+                                              CoterieMotion.snappyOut.transform(
+                                                _buttonAppearController.value,
+                                              );
+
+                                          return Stack(
+                                            alignment: Alignment.topCenter,
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              Align(
+                                                alignment: Alignment.topCenter,
+                                                child: Transform.translate(
+                                                  offset: Offset(0.0, baseDy),
                                                   child: Transform.rotate(
-                                                    alignment: _tearLeftToRight
-                                                        ? Alignment.topRight
-                                                        : Alignment.topLeft,
-                                                    angle: tearAngle,
-                                                    child: CustomPaint(
-                                                      painter:
-                                                          const _StubShadowPainter(
-                                                        isTopStub: false,
-                                                        notchDepth: _notchDepth,
-                                                        notchHalfHeight:
-                                                            _notchHalfHeight,
-                                                      ),
-                                                      child: ClipPath(
-                                                        clipper:
-                                                            _LowerBodyClipper(
-                                                          notchDepth:
-                                                              _notchDepth,
-                                                          notchHalfHeight:
-                                                              _notchHalfHeight,
-                                                          tearProgress:
-                                                              _tearProgress,
-                                                          leftToRight:
-                                                              _tearLeftToRight,
-                                                        ),
-                                                        child: cachedLowerBody,
+                                                    alignment: const Alignment(
+                                                      0.0,
+                                                      -0.92,
+                                                    ),
+                                                    angle: tiltAngle,
+                                                    child: SizedBox(
+                                                      width: _ticketW,
+                                                      height: _ticketH,
+                                                      child: Stack(
+                                                        clipBehavior: Clip.none,
+                                                        children: [
+                                                          // 1. TOP TAG STUB (0 .. _notchY)
+                                                          Positioned(
+                                                            top: 0,
+                                                            left: 0,
+                                                            width: _ticketW,
+                                                            height: _notchY,
+                                                            child: GestureDetector(
+                                                              behavior:
+                                                                  HitTestBehavior
+                                                                      .opaque,
+                                                              onPanStart:
+                                                                  _onTicketMoveStart,
+                                                              onPanUpdate:
+                                                                  _onTicketMoveUpdate,
+                                                              onPanEnd:
+                                                                  _onTicketMoveEnd,
+                                                              child: CustomPaint(
+                                                                painter: const _StubShadowPainter(
+                                                                  isTopStub:
+                                                                      true,
+                                                                  notchDepth:
+                                                                      _notchDepth,
+                                                                  notchHalfHeight:
+                                                                      _notchHalfHeight,
+                                                                ),
+                                                                child: ClipPath(
+                                                                  clipper: _TopStubClipper(
+                                                                    notchDepth:
+                                                                        _notchDepth,
+                                                                    notchHalfHeight:
+                                                                        _notchHalfHeight,
+                                                                    tearProgress:
+                                                                        _tearProgress,
+                                                                    leftToRight:
+                                                                        _tearLeftToRight,
+                                                                  ),
+                                                                  child:
+                                                                      cachedTopStub,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ),
+
+                                                          // 2. LOWER TICKET BODY (_notchY .. _ticketH)
+                                                          if (lowerOpacity >
+                                                              0.0)
+                                                            Positioned(
+                                                              top:
+                                                                  _notchY +
+                                                                  tearGap,
+                                                              left: tearDx,
+                                                              width: _ticketW,
+                                                              height:
+                                                                  _ticketH -
+                                                                  _notchY,
+                                                              child: GestureDetector(
+                                                                behavior:
+                                                                    HitTestBehavior
+                                                                        .opaque,
+                                                                onPanStart:
+                                                                    _onTicketMoveStart,
+                                                                onPanUpdate:
+                                                                    _onTicketMoveUpdate,
+                                                                onPanEnd:
+                                                                    _onTicketMoveEnd,
+                                                                child: Opacity(
+                                                                  opacity:
+                                                                      lowerOpacity,
+                                                                  child: Transform.rotate(
+                                                                    alignment: _tearLeftToRight
+                                                                        ? Alignment
+                                                                              .topRight
+                                                                        : Alignment
+                                                                              .topLeft,
+                                                                    angle:
+                                                                        tearAngle,
+                                                                    child: CustomPaint(
+                                                                      painter: const _StubShadowPainter(
+                                                                        isTopStub:
+                                                                            false,
+                                                                        notchDepth:
+                                                                            _notchDepth,
+                                                                        notchHalfHeight:
+                                                                            _notchHalfHeight,
+                                                                      ),
+                                                                      child: ClipPath(
+                                                                        clipper: _LowerBodyClipper(
+                                                                          notchDepth:
+                                                                              _notchDepth,
+                                                                          notchHalfHeight:
+                                                                              _notchHalfHeight,
+                                                                          tearProgress:
+                                                                              _tearProgress,
+                                                                          leftToRight:
+                                                                              _tearLeftToRight,
+                                                                        ),
+                                                                        child:
+                                                                            cachedLowerBody,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+
+                                                          // 3. Perforation crease line across the V-notches
+                                                          if (!_isRippedOff)
+                                                            Positioned(
+                                                              top:
+                                                                  _notchY - 1.0,
+                                                              left: _notchDepth,
+                                                              right:
+                                                                  _notchDepth,
+                                                              height: 3.0,
+                                                              child: IgnorePointer(
+                                                                child: CustomPaint(
+                                                                  painter: _DynamicPerforationPainter(
+                                                                    tearProgress:
+                                                                        _tearProgress,
+                                                                    leftToRight:
+                                                                        _tearLeftToRight,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+
+                                                          // 4. DEDICATED CUT-SECTION SWIPE ZONE (ONLY around _notchY ± 24px)
+                                                          if (!_isRippedOff)
+                                                            Positioned(
+                                                              top:
+                                                                  _notchY -
+                                                                  24.0,
+                                                              left: 0,
+                                                              right: 0,
+                                                              height: 48.0,
+                                                              child: GestureDetector(
+                                                                behavior:
+                                                                    HitTestBehavior
+                                                                        .opaque,
+                                                                onHorizontalDragStart:
+                                                                    _onCutSectionHorizontalDragStart,
+                                                                onHorizontalDragUpdate:
+                                                                    _onCutSectionHorizontalDragUpdate,
+                                                                onHorizontalDragEnd:
+                                                                    _onCutSectionHorizontalDragEnd,
+                                                                child:
+                                                                    const SizedBox.expand(),
+                                                              ),
+                                                            ),
+                                                        ],
                                                       ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
 
-                                          // C. Perforation crease line across the V-notches
-                                          if (!_isRippedOff)
-                                            Positioned(
-                                              top: _notchY - 1.0,
-                                              left: _notchDepth,
-                                              right: _notchDepth,
-                                              height: 3.0,
-                                              child: IgnorePointer(
-                                                child: CustomPaint(
-                                                  painter:
-                                                      _DynamicPerforationPainter(
-                                                    tearProgress: _tearProgress,
-                                                    leftToRight:
-                                                        _tearLeftToRight,
+                                              // 5. POST-CUT BEZELED BUTTON (Styled like top opening; pushes everything up)
+                                              if (_isRippedOff && btnT > 0.0)
+                                                Positioned(
+                                                  top: 196.0 +
+                                                      (1.0 - btnT) * 28.0,
+                                                  child: Opacity(
+                                                    opacity: btnT.clamp(
+                                                      0.0,
+                                                      1.0,
+                                                    ),
+                                                    child: Transform.scale(
+                                                      scale:
+                                                          0.92 + (btnT * 0.08),
+                                                      child: Column(
+                                                        mainAxisSize:
+                                                            MainAxisSize.min,
+                                                        children: [
+                                                          CoterieBezelButton(
+                                                            label:
+                                                                'ENTER LEXICON',
+                                                            trailingGlyph: '↑',
+                                                            width: 256.0,
+                                                            height: 48.0,
+                                                            onPressed:
+                                                                _triggerPushUpToHome,
+                                                          ),
+                                                          const SizedBox(
+                                                            height: 16,
+                                                          ),
+                                                          GestureDetector(
+                                                            onTap:
+                                                                _resetAndReprint,
+                                                            child: MouseRegion(
+                                                              cursor:
+                                                                  SystemMouseCursors
+                                                                      .click,
+                                                              child: Text(
+                                                                '[ reprint ticket ]',
+                                                                style: CoterieTypography
+                                                                    .receiptMeta
+                                                                    .copyWith(
+                                                                      fontSize:
+                                                                          10.0,
+                                                                      color: CoterieColors
+                                                                          .inkMuted,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                                   ),
                                                 ),
-                                              ),
-                                            ),
-
-                                          // D. DEDICATED CUT-SECTION SWIPE ZONE (ONLY around _notchY ± 24px)
-                                          if (!_isRippedOff)
-                                            Positioned(
-                                              top: _notchY - 24.0,
-                                              left: 0,
-                                              right: 0,
-                                              height: 48.0,
-                                              child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.opaque,
-                                                onHorizontalDragStart:
-                                                    _onCutSectionHorizontalDragStart,
-                                                onHorizontalDragUpdate:
-                                                    _onCutSectionHorizontalDragUpdate,
-                                                onHorizontalDragEnd:
-                                                    _onCutSectionHorizontalDragEnd,
-                                                child: const SizedBox.expand(),
-                                              ),
-                                            ),
-                                        ],
+                                            ],
+                                          );
+                                        },
                                       ),
                                     ),
                                   ),
-                                ),
-                              );
-                            },
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ],
+                        );
+                      },
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        ),
+
+              // 2. RAW MINIMALIST HOME SCREEN (Pushed up from bottom as pushT -> 1.0)
+              if (pushT > 0.0)
+                Transform.translate(
+                  offset: Offset(0.0, screenH * (1.0 - pushT)),
+                  child: CoterieHomeScreen(
+                    onReturnToTicket: _returnFromHomeToTicket,
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -539,7 +698,6 @@ class _TopStubContent extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Low-brightness high-contrast weather cloud background
           Image.asset(
             'assets/images/weather_header.png',
             fit: BoxFit.cover,
@@ -553,7 +711,6 @@ class _TopStubContent extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top title: Receipt metadata on left + "Coterie" in distinct high-fashion Instrument Serif on right
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -577,14 +734,7 @@ class _TopStubContent extends StatelessWidget {
                       children: const [
                         Text(
                           'Coterie',
-                          style: TextStyle(
-                            fontFamily: 'InstrumentSerif',
-                            fontSize: 40.0,
-                            fontWeight: FontWeight.w400,
-                            height: 0.88,
-                            letterSpacing: 0.8,
-                            color: Color(0xFFF7F5EE),
-                          ),
+                          style: CoterieTypography.displayTitle,
                         ),
                         SizedBox(width: 2),
                         Padding(
@@ -603,7 +753,6 @@ class _TopStubContent extends StatelessWidget {
                   ],
                 ),
 
-                // Single line of physically embossed text
                 const Align(
                   alignment: Alignment.bottomLeft,
                   child: _EmbossedSingleLineText(
@@ -630,24 +779,7 @@ class _EmbossedSingleLineText extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.clip,
-      style: const TextStyle(
-        fontFamily: 'ReceiptMono',
-        fontSize: 9.5,
-        letterSpacing: 1.15,
-        color: Color(0xFFDAD7CE),
-        shadows: [
-          Shadow(
-            offset: Offset(-0.75, -0.75),
-            blurRadius: 0.0,
-            color: Color(0xB8FFFFFF),
-          ),
-          Shadow(
-            offset: Offset(0.95, 1.05),
-            blurRadius: 0.5,
-            color: Color(0xFF000000),
-          ),
-        ],
-      ),
+      style: CoterieTypography.embossedLabel,
     );
   }
 }
@@ -666,7 +798,7 @@ class _LowerTicketBodyContent extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      color: const Color(0xFFF3F0E8),
+      color: CoterieColors.archivalCream,
       child: Stack(
         fit: StackFit.expand,
         children: [
@@ -701,7 +833,6 @@ class _LowerTicketBodyContent extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Left vertical column: Niloofar Serif + ReceiptMono
                       Align(
                         alignment: Alignment.bottomLeft,
                         child: RotatedBox(
@@ -737,7 +868,6 @@ class _LowerTicketBodyContent extends StatelessWidget {
                         ),
                       ),
 
-                      // Right vertical column: ReceiptMono POS ticket metadata
                       Align(
                         alignment: Alignment.bottomRight,
                         child: RotatedBox(
@@ -1007,117 +1137,6 @@ class _DynamicPerforationPainter extends CustomPainter {
     return oldDelegate.tearProgress != tearProgress ||
         oldDelegate.leftToRight != leftToRight;
   }
-}
-
-/// Unified single-pass hyperrealistic slit painter (no horizontal split line).
-class _HyperrealisticSlitPainter extends CustomPainter {
-  const _HyperrealisticSlitPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final outerRRect = RRect.fromRectAndRadius(
-      rect,
-      Radius.circular(size.height / 2),
-    );
-
-    final bevelRect = rect.deflate(4.2);
-    final bevelRRect = RRect.fromRectAndRadius(
-      bevelRect,
-      Radius.circular(bevelRect.height / 2),
-    );
-
-    final throatRect = Rect.fromCenter(
-      center: Offset(size.width / 2, size.height / 2 + 0.5),
-      width: size.width - 26.0,
-      height: size.height - 15.0,
-    );
-    final throatRRect = RRect.fromRectAndRadius(
-      throatRect,
-      Radius.circular(throatRect.height / 2),
-    );
-
-    // Soft outer elevation shadow on the white background
-    canvas.drawRRect(
-      outerRRect.shift(const Offset(0, 3.0)),
-      Paint()
-        ..color = const Color(0xFF000000).withValues(alpha: 0.10)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0),
-    );
-
-    // Outer gray rounded border housing
-    final outerGradient = const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Color(0xFFE7E6E2),
-        Color(0xFFD6D5D0),
-        Color(0xFFC5C4BE),
-        Color(0xFFDDDDD8),
-      ],
-      stops: [0.0, 0.45, 0.80, 1.0],
-    ).createShader(rect);
-    canvas.drawRRect(outerRRect, Paint()..shader = outerGradient);
-
-    canvas.drawRRect(
-      outerRRect.deflate(0.5),
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0
-        ..color = const Color(0xFFB8B7B0),
-    );
-
-    // Inner recessed bevel
-    final bevelGradient = const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Color(0xFF8E8D87),
-        Color(0xFFB5B4AE),
-        Color(0xFFDEDDD8),
-        Color(0xFFF4F4F1),
-      ],
-      stops: [0.0, 0.35, 0.72, 1.0],
-    ).createShader(bevelRect);
-    canvas.drawRRect(bevelRRect, Paint()..shader = bevelGradient);
-
-    // Fuzzy black interior feather
-    canvas.drawRRect(
-      throatRRect.inflate(2.4),
-      Paint()
-        ..color = const Color(0xFF19191C).withValues(alpha: 0.85)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.2),
-    );
-
-    // Deep fuzzy black cavity
-    final throatShader = const LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Color(0xFF040405),
-        Color(0xFF09090B),
-        Color(0xFF101013),
-        Color(0xFF050507),
-      ],
-    ).createShader(throatRect);
-    canvas.drawRRect(throatRRect, Paint()..shader = throatShader);
-
-    final rng = math.Random(42);
-    final dotPaint = Paint();
-    canvas.save();
-    canvas.clipRRect(throatRRect);
-    for (int i = 0; i < 220; i++) {
-      final fx = throatRect.left + rng.nextDouble() * throatRect.width;
-      final fy = throatRect.top + rng.nextDouble() * throatRect.height;
-      dotPaint.color = const Color(0xFF34343A)
-          .withValues(alpha: 0.08 + rng.nextDouble() * 0.12);
-      canvas.drawCircle(Offset(fx, fy), 0.6, dotPaint);
-    }
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(covariant _HyperrealisticSlitPainter oldDelegate) => false;
 }
 
 class _MuseumBarcodePainter extends CustomPainter {
