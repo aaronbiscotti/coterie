@@ -49,10 +49,16 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   static const double _notchHalfHeight = 13.0;
 
   late final AnimationController _printController;
-  late final AnimationController _settleSpringController;
+  late final AnimationController _settleSpringXController;
+  late final AnimationController _settleSpringYController;
   late final AnimationController _ripDetachController;
 
-  double _tearProgress = 0.0; // 0.0 = intact, 1.0 = fully ripped across cut line
+  // Whole-ticket drag offset when dragging anywhere OTHER than the cut section
+  Offset _ticketDragOffset = Offset.zero;
+  bool _isDraggingTicket = false;
+
+  // Cut-section horizontal swipe-to-rip state (ONLY triggered around _notchY)
+  double _tearProgress = 0.0;
   bool _tearLeftToRight = true;
   bool _isRippedOff = false;
 
@@ -65,7 +71,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       duration: const Duration(milliseconds: 2400),
     );
 
-    _settleSpringController = AnimationController.unbounded(vsync: this);
+    _settleSpringXController = AnimationController.unbounded(vsync: this);
+    _settleSpringYController = AnimationController.unbounded(vsync: this);
 
     _ripDetachController = AnimationController(
       vsync: this,
@@ -80,7 +87,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
           damping: 23.0,
         );
         final sim = SpringSimulation(spring, -5.0, 0.0, 110.0);
-        _settleSpringController.animateWith(sim);
+        _settleSpringYController.animateWith(sim);
       }
     });
 
@@ -107,40 +114,104 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   }
 
   void _resetAndReprint() {
-    _settleSpringController.stop();
-    _settleSpringController.value = 0.0;
+    _settleSpringXController.stop();
+    _settleSpringYController.stop();
+    _settleSpringXController.value = 0.0;
+    _settleSpringYController.value = 0.0;
     _ripDetachController.reset();
     setState(() {
+      _ticketDragOffset = Offset.zero;
+      _isDraggingTicket = false;
       _tearProgress = 0.0;
       _isRippedOff = false;
     });
     _printController.forward(from: 0.0);
   }
 
-  void _onCutHorizontalDragStart(DragStartDetails details) {
+  // ---------------------------------------------------------------------------
+  // 1. WHOLE-TICKET MOVE GESTURE (Triggered anywhere OUTSIDE the cut section)
+  // ---------------------------------------------------------------------------
+  void _onTicketMoveStart(DragStartDetails details) {
+    if (_printController.isAnimating) return;
+    _settleSpringXController.stop();
+    _settleSpringYController.stop();
+    setState(() {
+      _isDraggingTicket = true;
+      _ticketDragOffset = Offset(
+        _settleSpringXController.value,
+        _settleSpringYController.value,
+      );
+    });
+  }
+
+  void _onTicketMoveUpdate(DragUpdateDetails details) {
+    if (_printController.isAnimating) return;
+    setState(() {
+      // Physical resistance so moving the ticket feels tactile and anchored in the slit
+      final nextDx = (_ticketDragOffset.dx + details.delta.dx * 0.65)
+          .clamp(-72.0, 72.0);
+      final nextDy = (_ticketDragOffset.dy + details.delta.dy * 0.65)
+          .clamp(-24.0, 96.0);
+      _ticketDragOffset = Offset(nextDx, nextDy);
+    });
+  }
+
+  void _onTicketMoveEnd(DragEndDetails details) {
+    if (!_isDraggingTicket) return;
+    final startOffset = _ticketDragOffset;
+    setState(() {
+      _isDraggingTicket = false;
+    });
+
+    const spring = SpringDescription(
+      mass: 1.0,
+      stiffness: 360.0,
+      damping: 22.0,
+    );
+    _settleSpringXController.animateWith(
+      SpringSimulation(
+        spring,
+        startOffset.dx,
+        0.0,
+        details.velocity.pixelsPerSecond.dx * 0.25,
+      ),
+    );
+    _settleSpringYController.animateWith(
+      SpringSimulation(
+        spring,
+        startOffset.dy,
+        0.0,
+        details.velocity.pixelsPerSecond.dy * 0.25,
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // 2. CUT-SECTION SWIPE-TO-RIP GESTURE (Triggered ONLY around the V-notch cut line)
+  // ---------------------------------------------------------------------------
+  void _onCutSectionHorizontalDragStart(DragStartDetails details) {
     if (_isRippedOff || _printController.isAnimating) return;
     _tearLeftToRight = details.localPosition.dx < (_ticketW / 2.0);
   }
 
-  void _onCutHorizontalDragUpdate(DragUpdateDetails details) {
+  void _onCutSectionHorizontalDragUpdate(DragUpdateDetails details) {
     if (_isRippedOff || _printController.isAnimating) return;
     final delta = _tearLeftToRight ? details.delta.dx : -details.delta.dx;
-    final next = (_tearProgress + (delta / (_ticketW * 0.72))).clamp(0.0, 1.0);
+    final next = (_tearProgress + (delta / (_ticketW * 0.68))).clamp(0.0, 1.0);
     setState(() {
       _tearProgress = next;
     });
-    if (_tearProgress >= 0.92) {
+    if (_tearProgress >= 0.90) {
       _completeRip();
     }
   }
 
-  void _onCutHorizontalDragEnd(DragEndDetails details) {
+  void _onCutSectionHorizontalDragEnd(DragEndDetails details) {
     if (_isRippedOff || _printController.isAnimating) return;
     final vx = details.velocity.pixelsPerSecond.dx.abs();
-    if (_tearProgress >= 0.30 || (vx > 240.0 && _tearProgress > 0.10)) {
+    if (_tearProgress >= 0.28 || (vx > 220.0 && _tearProgress > 0.08)) {
       _completeRip();
     } else {
-      // Snap back smoothly if swipe was tiny
       setState(() {
         _tearProgress = 0.0;
       });
@@ -153,13 +224,12 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
       _tearProgress = 1.0;
       _isRippedOff = true;
     });
-    // Small upward recoil on the remaining top stub when ripped
     const stubSpring = SpringDescription(
       mass: 1.0,
       stiffness: 460.0,
       damping: 22.0,
     );
-    _settleSpringController.animateWith(
+    _settleSpringYController.animateWith(
       SpringSimulation(stubSpring, -4.5, 0.0, -90.0),
     );
     _ripDetachController.forward(from: 0.0);
@@ -168,15 +238,14 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
   @override
   void dispose() {
     _printController.dispose();
-    _settleSpringController.dispose();
+    _settleSpringXController.dispose();
+    _settleSpringYController.dispose();
     _ripDetachController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // Pre-built static upper stub & lower body widgets wrapped in RepaintBoundary
-    // so neither image nor typography ever flickers during printing or tearing.
     const Widget cachedTopStub = RepaintBoundary(
       child: _TopStubContent(
         width: _ticketW,
@@ -207,7 +276,7 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                 scale: scale,
                 alignment: Alignment.center,
                 child: SizedBox(
-                  width: slitW + 40,
+                  width: slitW + 120,
                   height: _ticketH + 68,
                   child: Stack(
                     alignment: Alignment.topCenter,
@@ -236,20 +305,30 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                           child: AnimatedBuilder(
                             animation: Listenable.merge([
                               _printController,
-                              _settleSpringController,
+                              _settleSpringXController,
+                              _settleSpringYController,
                               _ripDetachController,
                             ]),
                             builder: (context, _) {
                               final progress = const TicketFeedCurve()
                                   .transform(_printController.value);
-                              final springOffset = _settleSpringController.value;
+
+                              final moveDx = _isDraggingTicket
+                                  ? _ticketDragOffset.dx
+                                  : _settleSpringXController.value;
+                              final moveDy = _isDraggingTicket
+                                  ? _ticketDragOffset.dy
+                                  : _settleSpringYController.value;
 
                               const double hiddenTravel = _ticketH + 10.0;
                               final double baseDy =
-                                  -hiddenTravel * (1.0 - progress) +
-                                  springOffset;
+                                  -hiddenTravel * (1.0 - progress) + moveDy;
 
-                              // Rip detachment physics (asymmetric ease-out + gravity fall)
+                              // Subtle pendulum tilt when moving the whole ticket horizontally
+                              final double moveTiltAngle =
+                                  (moveDx / 320.0).clamp(-0.09, 0.09);
+
+                              // Rip detachment physics
                               final double ripT = const Cubic(
                                 0.22,
                                 1.0,
@@ -259,7 +338,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
 
                               final double tearGap =
                                   (_tearProgress * 10.0) + (ripT * 115.0);
-                              final double tearDx = (_tearLeftToRight ? 1.0 : -1.0) *
+                              final double tearDx =
+                                  (_tearLeftToRight ? 1.0 : -1.0) *
                                   ((_tearProgress * 4.0) + (ripT * 28.0));
                               final double tearAngle =
                                   (_tearLeftToRight ? 1.0 : -1.0) *
@@ -270,88 +350,103 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                               return Align(
                                 alignment: Alignment.topCenter,
                                 child: Transform.translate(
-                                  offset: Offset(0.0, baseDy),
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.opaque,
-                                    onHorizontalDragStart:
-                                        _onCutHorizontalDragStart,
-                                    onHorizontalDragUpdate:
-                                        _onCutHorizontalDragUpdate,
-                                    onHorizontalDragEnd:
-                                        _onCutHorizontalDragEnd,
-                                    onTap: _isRippedOff ? _resetAndReprint : null,
+                                  offset: Offset(moveDx, baseDy),
+                                  child: Transform.rotate(
+                                    alignment: Alignment.topCenter,
+                                    angle: moveTiltAngle,
                                     child: SizedBox(
                                       width: _ticketW,
                                       height: _ticketH,
                                       child: Stack(
                                         clipBehavior: Clip.none,
                                         children: [
-                                          // A. TOP TAG STUB (0 .. _notchY)
+                                          // A. TOP TAG STUB (0 .. _notchY) — Dragging here moves the ticket
                                           Positioned(
                                             top: 0,
                                             left: 0,
                                             width: _ticketW,
                                             height: _notchY,
-                                            child: CustomPaint(
-                                              painter: _StubShadowPainter(
-                                                isTopStub: true,
-                                                notchDepth: _notchDepth,
-                                                notchHalfHeight:
-                                                    _notchHalfHeight,
-                                              ),
-                                              child: ClipPath(
-                                                clipper: _TopStubClipper(
+                                            child: GestureDetector(
+                                              behavior: HitTestBehavior.opaque,
+                                              onPanStart: _onTicketMoveStart,
+                                              onPanUpdate: _onTicketMoveUpdate,
+                                              onPanEnd: _onTicketMoveEnd,
+                                              onTap: _isRippedOff
+                                                  ? _resetAndReprint
+                                                  : null,
+                                              child: CustomPaint(
+                                                painter:
+                                                    const _StubShadowPainter(
+                                                  isTopStub: true,
                                                   notchDepth: _notchDepth,
                                                   notchHalfHeight:
                                                       _notchHalfHeight,
-                                                  tearProgress: _tearProgress,
-                                                  leftToRight: _tearLeftToRight,
                                                 ),
-                                                child: cachedTopStub,
+                                                child: ClipPath(
+                                                  clipper: _TopStubClipper(
+                                                    notchDepth: _notchDepth,
+                                                    notchHalfHeight:
+                                                        _notchHalfHeight,
+                                                    tearProgress: _tearProgress,
+                                                    leftToRight:
+                                                        _tearLeftToRight,
+                                                  ),
+                                                  child: cachedTopStub,
+                                                ),
                                               ),
                                             ),
                                           ),
 
-                                          // B. LOWER TICKET BODY (_notchY .. _ticketH) — Rips off when swiping cut section
+                                          // B. LOWER TICKET BODY (_notchY .. _ticketH) — Dragging here moves the ticket
                                           if (lowerOpacity > 0.0)
                                             Positioned(
                                               top: _notchY + tearGap,
                                               left: tearDx,
                                               width: _ticketW,
                                               height: _ticketH - _notchY,
-                                              child: Opacity(
-                                                opacity: lowerOpacity,
-                                                child: Transform.rotate(
-                                                  alignment: _tearLeftToRight
-                                                      ? Alignment.topRight
-                                                      : Alignment.topLeft,
-                                                  angle: tearAngle,
-                                                  child: CustomPaint(
-                                                    painter: _StubShadowPainter(
-                                                      isTopStub: false,
-                                                      notchDepth: _notchDepth,
-                                                      notchHalfHeight:
-                                                          _notchHalfHeight,
-                                                    ),
-                                                    child: ClipPath(
-                                                      clipper:
-                                                          _LowerBodyClipper(
+                                              child: GestureDetector(
+                                                behavior:
+                                                    HitTestBehavior.opaque,
+                                                onPanStart: _onTicketMoveStart,
+                                                onPanUpdate:
+                                                    _onTicketMoveUpdate,
+                                                onPanEnd: _onTicketMoveEnd,
+                                                child: Opacity(
+                                                  opacity: lowerOpacity,
+                                                  child: Transform.rotate(
+                                                    alignment: _tearLeftToRight
+                                                        ? Alignment.topRight
+                                                        : Alignment.topLeft,
+                                                    angle: tearAngle,
+                                                    child: CustomPaint(
+                                                      painter:
+                                                          const _StubShadowPainter(
+                                                        isTopStub: false,
                                                         notchDepth: _notchDepth,
                                                         notchHalfHeight:
                                                             _notchHalfHeight,
-                                                        tearProgress:
-                                                            _tearProgress,
-                                                        leftToRight:
-                                                            _tearLeftToRight,
                                                       ),
-                                                      child: cachedLowerBody,
+                                                      child: ClipPath(
+                                                        clipper:
+                                                            _LowerBodyClipper(
+                                                          notchDepth:
+                                                              _notchDepth,
+                                                          notchHalfHeight:
+                                                              _notchHalfHeight,
+                                                          tearProgress:
+                                                              _tearProgress,
+                                                          leftToRight:
+                                                              _tearLeftToRight,
+                                                        ),
+                                                        child: cachedLowerBody,
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
                                             ),
 
-                                          // C. Perforation crease line across the V-notches (rips open as _tearProgress advances)
+                                          // C. Perforation crease line across the V-notches
                                           if (!_isRippedOff)
                                             Positioned(
                                               top: _notchY - 1.0,
@@ -367,6 +462,27 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                                                         _tearLeftToRight,
                                                   ),
                                                 ),
+                                              ),
+                                            ),
+
+                                          // D. DEDICATED CUT-SECTION SWIPE ZONE (ONLY around _notchY ± 24px)
+                                          // Swiping horizontally here rips the tag off; dragging anywhere else moves the ticket!
+                                          if (!_isRippedOff)
+                                            Positioned(
+                                              top: _notchY - 24.0,
+                                              left: 0,
+                                              right: 0,
+                                              height: 48.0,
+                                              child: GestureDetector(
+                                                behavior:
+                                                    HitTestBehavior.opaque,
+                                                onHorizontalDragStart:
+                                                    _onCutSectionHorizontalDragStart,
+                                                onHorizontalDragUpdate:
+                                                    _onCutSectionHorizontalDragUpdate,
+                                                onHorizontalDragEnd:
+                                                    _onCutSectionHorizontalDragEnd,
+                                                child: const SizedBox.expand(),
                                               ),
                                             ),
                                         ],
@@ -407,8 +523,8 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
 }
 
 /// Top section above the V-notch cut line:
-/// Low-brightness moody weather/cloud background (high contrast for light text)
-/// + "Coterie" in Niloofar Serif + a single line of physically embossed text.
+/// Low-brightness moody weather/cloud background + "Coterie" in a distinct high-fashion
+/// display serif (Instrument Serif) + a single line of physically embossed text.
 class _TopStubContent extends StatelessWidget {
   final double width;
   final double height;
@@ -435,24 +551,27 @@ class _TopStubContent extends StatelessWidget {
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Top title: "Coterie" in Niloofar Serif with Louvre-inspired light ivory contrast
+                // Top title: Receipt metadata on left + "Coterie" in distinct high-fashion Instrument Serif on right
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Tck: 1531',
-                      style: TextStyle(
-                        fontFamily: 'SpaceMono',
-                        fontSize: 9.0,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.4,
-                        color: Color(0xFFD0CEC7),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Tck: 2267  Trn: 12\nId: 15943',
+                        style: TextStyle(
+                          fontFamily: 'ReceiptMono',
+                          fontSize: 10.0,
+                          height: 1.25,
+                          letterSpacing: 0.5,
+                          color: Color(0xFFD2CFC8),
+                        ),
                       ),
                     ),
                     Row(
@@ -462,12 +581,12 @@ class _TopStubContent extends StatelessWidget {
                         Text(
                           'Coterie',
                           style: TextStyle(
-                            fontFamily: 'Niloofar',
-                            fontSize: 34.0,
-                            fontWeight: FontWeight.w700,
-                            height: 0.90,
-                            letterSpacing: 0.6,
-                            color: Color(0xFFF6F4EC),
+                            fontFamily: 'InstrumentSerif',
+                            fontSize: 40.0,
+                            fontWeight: FontWeight.w400,
+                            height: 0.88,
+                            letterSpacing: 0.8,
+                            color: Color(0xFFF7F5EE),
                           ),
                         ),
                         SizedBox(width: 2),
@@ -476,9 +595,8 @@ class _TopStubContent extends StatelessWidget {
                           child: Text(
                             '®',
                             style: TextStyle(
-                              fontFamily: 'SpaceMono',
-                              fontSize: 10.0,
-                              fontWeight: FontWeight.w700,
+                              fontFamily: 'ReceiptMono',
+                              fontSize: 10.5,
                               color: Color(0xFFEAE7DD),
                             ),
                           ),
@@ -488,7 +606,7 @@ class _TopStubContent extends StatelessWidget {
                   ],
                 ),
 
-                // Single line of embossed text
+                // Single line of physically embossed text
                 const Align(
                   alignment: Alignment.bottomLeft,
                   child: _EmbossedSingleLineText(
@@ -518,19 +636,16 @@ class _EmbossedSingleLineText extends StatelessWidget {
       maxLines: 1,
       overflow: TextOverflow.clip,
       style: const TextStyle(
-        fontFamily: 'SpaceMono',
-        fontSize: 8.4,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.95,
-        color: Color(0xFFD8D5CC),
+        fontFamily: 'ReceiptMono',
+        fontSize: 9.5,
+        letterSpacing: 1.15,
+        color: Color(0xFFDAD7CE),
         shadows: [
-          // Top-left specular ridge highlight (embossed upper bevel)
           Shadow(
             offset: Offset(-0.75, -0.75),
             blurRadius: 0.0,
             color: Color(0xB8FFFFFF),
           ),
-          // Bottom-right deep die-stamped shadow (embossed lower recess)
           Shadow(
             offset: Offset(0.95, 1.05),
             blurRadius: 0.5,
@@ -543,7 +658,9 @@ class _EmbossedSingleLineText extends StatelessWidget {
 }
 
 /// Lower ticket body below the V-notch cut line:
-/// 16th-century Dutch portrait (uncompressed B&W + grain) + simple vertical Mono/Niloofar text + bottom Barcode.
+/// 1. Purely cropped 1:1 aspect-ratio 16th-century Dutch portrait (256x144 = 16:9, zero squishing)
+/// 2. Clean archival cream field with 90° vertical Niloofar Serif + ReceiptMono ticket metadata
+/// 3. Bottom Barcode + ReceiptMono serial
 class _LowerTicketBodyContent extends StatelessWidget {
   final double width;
   final double height;
@@ -574,10 +691,10 @@ class _LowerTicketBodyContent extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // 1. 16th-century Dutch portrait (uncompressed 5900x7160 master scan in B&W + fine grain)
+              // 1. Purely cropped 16th-century Dutch portrait (exact 256x144 = 16:9 crop, never stretched)
               SizedBox(
-                height: 144,
                 width: width,
+                height: 144,
                 child: Image.asset(
                   'assets/images/dutch_16c_bw_grain.png',
                   fit: BoxFit.cover,
@@ -586,15 +703,15 @@ class _LowerTicketBodyContent extends StatelessWidget {
                 ),
               ),
 
-              // 2. Clean archival cream field with simple 90° vertical SpaceMono + Niloofar Serif text
+              // 2. Archival cream field with 90° vertical Niloofar Serif + thermal ReceiptMono metadata
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Left vertical pair (Mono + Niloofar Serif)
+                      // Left vertical column: Niloofar Serif + ReceiptMono
                       Align(
                         alignment: Alignment.bottomLeft,
                         child: RotatedBox(
@@ -604,14 +721,13 @@ class _LowerTicketBodyContent extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: const [
                               Text(
-                                '1531 – 2026',
+                                'AUG 30 – OCT 21  ·  1531',
                                 style: TextStyle(
-                                  fontFamily: 'SpaceMono',
+                                  fontFamily: 'ReceiptMono',
                                   fontSize: 11.5,
-                                  fontWeight: FontWeight.w400,
-                                  letterSpacing: 0.2,
+                                  letterSpacing: 0.4,
                                   height: 1.2,
-                                  color: Color(0xFF22211F),
+                                  color: Color(0xFF2B2A27),
                                 ),
                               ),
                               SizedBox(height: 2),
@@ -619,11 +735,11 @@ class _LowerTicketBodyContent extends StatelessWidget {
                                 'Dirck Jacobsz',
                                 style: TextStyle(
                                   fontFamily: 'Niloofar',
-                                  fontSize: 16.0,
+                                  fontSize: 16.5,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.1,
                                   height: 1.1,
-                                  color: Color(0xFF161514),
+                                  color: Color(0xFF151413),
                                 ),
                               ),
                             ],
@@ -631,7 +747,7 @@ class _LowerTicketBodyContent extends StatelessWidget {
                         ),
                       ),
 
-                      // Right vertical pair (Mono + Niloofar Serif)
+                      // Right vertical column: ReceiptMono POS ticket metadata (Louvre-style)
                       Align(
                         alignment: Alignment.bottomRight,
                         child: RotatedBox(
@@ -641,26 +757,24 @@ class _LowerTicketBodyContent extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: const [
                               Text(
-                                'DE-653',
+                                'CTR.WKS47  06/11/26  12:41',
                                 style: TextStyle(
-                                  fontFamily: 'SpaceMono',
-                                  fontSize: 11.5,
-                                  fontWeight: FontWeight.w400,
-                                  letterSpacing: 0.2,
-                                  height: 1.2,
-                                  color: Color(0xFF22211F),
+                                  fontFamily: 'ReceiptMono',
+                                  fontSize: 10.5,
+                                  letterSpacing: 0.3,
+                                  height: 1.25,
+                                  color: Color(0xFF33312E),
                                 ),
                               ),
                               SizedBox(height: 2),
                               Text(
-                                '12 Euros',
+                                'DE-653  ·  PRIX : 12 EUROS',
                                 style: TextStyle(
-                                  fontFamily: 'Niloofar',
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.1,
-                                  height: 1.1,
-                                  color: Color(0xFF161514),
+                                  fontFamily: 'ReceiptMono',
+                                  fontSize: 11.5,
+                                  letterSpacing: 0.4,
+                                  height: 1.2,
+                                  color: Color(0xFF181715),
                                 ),
                               ),
                             ],
@@ -672,7 +786,7 @@ class _LowerTicketBodyContent extends StatelessWidget {
                 ),
               ),
 
-              // 3. Bottom Barcode + Mono Serial
+              // 3. Bottom Barcode + ReceiptMono Serial
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: Column(
@@ -685,14 +799,13 @@ class _LowerTicketBodyContent extends StatelessWidget {
                         painter: _MuseumBarcodePainter(),
                       ),
                     ),
-                    SizedBox(height: 6),
+                    SizedBox(height: 5),
                     Text(
                       '(10) ABC123 (21) 0001',
                       style: TextStyle(
-                        fontFamily: 'SpaceMono',
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 0.6,
+                        fontFamily: 'ReceiptMono',
+                        fontSize: 10.0,
+                        letterSpacing: 0.8,
                         color: Color(0xFF1C1B1A),
                       ),
                     ),
@@ -707,8 +820,6 @@ class _LowerTicketBodyContent extends StatelessWidget {
   }
 }
 
-/// Clips the top stub (`0 .. notchY`), including the upper half of the V-notches
-/// and a serrated torn paper bottom edge where ripped.
 class _TopStubClipper extends CustomClipper<Path> {
   final double notchDepth;
   final double notchHalfHeight;
@@ -732,11 +843,9 @@ class _TopStubClipper extends CustomClipper<Path> {
     path.lineTo(size.width - r, 0);
     path.quadraticBezierTo(size.width, 0, size.width, r);
 
-    // Right edge down to V-notch apex
     path.lineTo(size.width, size.height - notchHalfHeight);
     path.lineTo(size.width - notchDepth, size.height);
 
-    // Bottom cut edge from right notch to left notch (with serrated paper tear teeth where ripped)
     _addSerratedCutEdge(
       path: path,
       fromX: size.width - notchDepth,
@@ -746,7 +855,6 @@ class _TopStubClipper extends CustomClipper<Path> {
       leftToRight: leftToRight,
     );
 
-    // Left V-notch apex up to top-left
     path.lineTo(0, size.height - notchHalfHeight);
     path.close();
     return path;
@@ -759,8 +867,6 @@ class _TopStubClipper extends CustomClipper<Path> {
   }
 }
 
-/// Clips the lower ticket body (`notchY .. ticketH`), including the lower half of the V-notches
-/// and a matching serrated torn paper top edge where ripped.
 class _LowerBodyClipper extends CustomClipper<Path> {
   final double notchDepth;
   final double notchHalfHeight;
@@ -779,10 +885,8 @@ class _LowerBodyClipper extends CustomClipper<Path> {
     const double r = 1.5;
     final path = Path();
 
-    // Start at left V-notch apex (top of lower body)
     path.moveTo(notchDepth, 0);
 
-    // Top cut edge from left notch to right notch
     _addSerratedCutEdge(
       path: path,
       fromX: notchDepth,
@@ -792,16 +896,13 @@ class _LowerBodyClipper extends CustomClipper<Path> {
       leftToRight: leftToRight,
     );
 
-    // Right V-notch lower slope down to bottom-right
     path.lineTo(size.width, notchHalfHeight);
     path.lineTo(size.width, size.height - r);
     path.quadraticBezierTo(size.width, size.height, size.width - r, size.height);
 
-    // Bottom edge to bottom-left
     path.lineTo(r, size.height);
     path.quadraticBezierTo(0, size.height, 0, size.height - r);
 
-    // Left edge up to left V-notch apex
     path.lineTo(0, notchHalfHeight);
     path.close();
     return path;
@@ -919,8 +1020,6 @@ class _DynamicPerforationPainter extends CustomPainter {
   }
 }
 
-/// Hyperrealistic bezeled slit: rounded gray outer border, beveled rim, and fuzzy black interior.
-/// Completely static (`shouldRepaint => false`) so it never flickers.
 class _HyperrealisticSlitPainter extends CustomPainter {
   final bool isUpperOverlayOnly;
 
@@ -1069,7 +1168,6 @@ class _HyperrealisticSlitPainter extends CustomPainter {
   bool shouldRepaint(covariant _HyperrealisticSlitPainter oldDelegate) => false;
 }
 
-/// Crisp Code-128 style vertical-bar Barcode at the bottom of the ticket.
 class _MuseumBarcodePainter extends CustomPainter {
   const _MuseumBarcodePainter();
 

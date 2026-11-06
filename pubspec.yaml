@@ -24,6 +24,11 @@ flutter:
     - assets/images/weather_header.png
 
   fonts:
+    - family: InstrumentSerif
+      fonts:
+        - asset: assets/fonts/InstrumentSerif-Regular.ttf
+        - asset: assets/fonts/InstrumentSerif-Italic.ttf
+          style: italic
     - family: Niloofar
       fonts:
         - asset: assets/fonts/XBNiloofar-Regular.ttf
@@ -31,6 +36,9 @@ flutter:
           weight: 700
         - asset: assets/fonts/XBNiloofar-Italic.ttf
           style: italic
+    - family: ReceiptMono
+      fonts:
+        - asset: assets/fonts/ShareTechMono-Regular.ttf
     - family: SpaceMono
       fonts:
         - asset: assets/fonts/SpaceMono-Regular.ttf
