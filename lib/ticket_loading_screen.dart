@@ -449,6 +449,9 @@ class _TicketLoadingScreenState extends State<TicketLoadingScreen>
                                                                   _onTicketMoveUpdate,
                                                               onPanEnd:
                                                                   _onTicketMoveEnd,
+                                                              onTap: _isRippedOff
+                                                                  ? _resetAndReprint
+                                                                  : null,
                                                               child: CustomPaint(
                                                                 painter: const _StubShadowPainter(
                                                                   isTopStub:
